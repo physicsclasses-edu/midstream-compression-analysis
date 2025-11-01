@@ -21,7 +21,7 @@ export default function Home() {
       case 'home':
         return <HomeContent />;
       case 'oil-impact':
-        return <OilImpactContent />;
+        return <OilImpactContent dateRange={dateRange} />;
       case 'compressor-incident':
         return <CompressorIncidentContent dateRange={dateRange} />;
       default:

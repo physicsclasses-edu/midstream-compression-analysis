@@ -173,7 +173,6 @@ export default function HomeContent() {
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                     {stat.label}
                   </p>
-                  <Icon className={`w-6 h-6 ${stat.color}`} />
                 </div>
 
                 {stat.hasDropdown ? (
@@ -181,15 +180,15 @@ export default function HomeContent() {
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
                       {stat.bblValue}
                     </p>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center">
                       <p className="text-xl font-bold text-red-600 dark:text-red-400">
                         {stat.dollarValue}
                       </p>
-                      <div className="relative">
+                      <div className="relative ml-20">
                         <select
                           value={benchmarkPrice}
                           onChange={(e) => setBenchmarkPrice(Number(e.target.value))}
-                          className="text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 pr-6 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 pr-6 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           {priceOptions.map((option) => (
                             <option key={option.label} value={option.value}>
@@ -426,11 +425,11 @@ export default function HomeContent() {
                 <div className="flex items-center space-x-4 text-xs">
                   <div className="flex items-center space-x-1">
                     <div className="w-3 h-3 bg-red-500 dark:bg-red-400 rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">1 Offline (12.8h)</span>
+                    <span className="text-gray-600 dark:text-gray-400">1 Offline</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <div className="w-3 h-3 bg-red-300 dark:bg-red-600 rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">2 Offline (2.4h)</span>
+                    <span className="text-gray-600 dark:text-gray-400">2 Offline</span>
                   </div>
                 </div>
               </div>
@@ -468,15 +467,15 @@ export default function HomeContent() {
                 <div className="flex items-center space-x-4 text-xs">
                   <div className="flex items-center space-x-1">
                     <div className="w-3 h-3 bg-orange-500 dark:bg-orange-400 rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">All Online (5.3h)</span>
+                    <span className="text-gray-600 dark:text-gray-400">All Online</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <div className="w-3 h-3 bg-orange-400 dark:bg-orange-500 rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">1 Offline (2.8h)</span>
+                    <span className="text-gray-600 dark:text-gray-400">1 Offline</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <div className="w-3 h-3 bg-orange-300 dark:bg-orange-600 rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">2 Offline (0.6h)</span>
+                    <span className="text-gray-600 dark:text-gray-400">2 Offline</span>
                   </div>
                 </div>
               </div>
@@ -514,38 +513,15 @@ export default function HomeContent() {
                 <div className="flex items-center space-x-4 text-xs">
                   <div className="flex items-center space-x-1">
                     <div className="w-3 h-3 bg-yellow-500 dark:bg-yellow-400 rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">All Online (2.9h)</span>
+                    <span className="text-gray-600 dark:text-gray-400">All Online</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <div className="w-3 h-3 bg-yellow-400 dark:bg-yellow-500 rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">1 Offline (2.4h)</span>
+                    <span className="text-gray-600 dark:text-gray-400">1 Offline</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <div className="w-3 h-3 bg-yellow-300 dark:bg-yellow-600 rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">2 Offline (0.8h)</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Capacity Exceeded */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">Capacity Exceeded</p>
-                  <p className="text-sm font-bold text-purple-600 dark:text-purple-400">3.4 hrs</p>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-2">
-                  <div
-                    className="bg-purple-500 dark:bg-purple-400 h-4 rounded-full flex items-center justify-center text-white text-xs font-medium"
-                    style={{ width: '100%' }}
-                    title="Capacity Exceeded: 3.4 hrs"
-                  >
-                    3.4h
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4 text-xs">
-                  <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-purple-500 dark:bg-purple-400 rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">Total (3.4h)</span>
+                    <span className="text-gray-600 dark:text-gray-400">2 Offline</span>
                   </div>
                 </div>
               </div>

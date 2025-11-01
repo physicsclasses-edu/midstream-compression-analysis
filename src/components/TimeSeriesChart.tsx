@@ -7,6 +7,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 interface TimeSeriesChartProps {
   well: string;
   metrics: string[];
+  dateRange: { from: string; to: string };
 }
 
 // Define phases with timestamps (in hours from start)
@@ -158,12 +159,35 @@ const generateTimeSeriesData = (metrics: string[], well: string) => {
   return data;
 };
 
-export default function TimeSeriesChart({ well, metrics }: TimeSeriesChartProps) {
+export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeriesChartProps) {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [rangeStart, setRangeStart] = useState(0);
+  const [rangeEnd, setRangeEnd] = useState(21);
 
   // Generate data immediately on render (deterministic, so SSR-safe)
   const data = generateTimeSeriesData(metrics, well);
+
+  // Update range when dateRange changes
+  useEffect(() => {
+    if (dateRange.from && dateRange.to && data.length > 0) {
+      const fromDate = new Date(dateRange.from);
+      const toDate = new Date(dateRange.to);
+      const startDate = new Date(data[0].timestamp);
+
+      // Calculate day indices based on date range
+      const startIndex = Math.max(0, Math.floor((fromDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
+      const endIndex = Math.min(data.length - 1, Math.floor((toDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
+
+      if (startIndex < data.length && endIndex >= 0) {
+        setRangeStart(Math.max(0, startIndex));
+        setRangeEnd(Math.min(data.length - 1, endIndex));
+      }
+    }
+  }, [dateRange, data.length]);
+
+  // Get visible data based on range
+  const visibleData = data.slice(rangeStart, rangeEnd + 1);
 
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -209,7 +233,7 @@ export default function TimeSeriesChart({ well, metrics }: TimeSeriesChartProps)
   };
 
   return (
-    <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+    <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700" style={{ outline: 'none' }}>
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
@@ -239,90 +263,61 @@ export default function TimeSeriesChart({ well, metrics }: TimeSeriesChartProps)
         </div>
       </div>
 
-      {/* Phase Legend */}
-      <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-green-200 dark:bg-green-900/30 border-2 border-green-500 dark:border-green-600 rounded"></div>
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Natural Phase</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-red-200 dark:bg-red-900/30 border-2 border-red-500 dark:border-red-600 rounded"></div>
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Shut-In Period</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-blue-200 dark:bg-blue-900/30 border-2 border-blue-500 dark:border-blue-600 rounded"></div>
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Continuous (Compression)</span>
-        </div>
-        {(showLinePressureThreshold || showGasInjectionPressureThreshold) && (
-          <>
-            <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
-            {showLinePressureThreshold && (
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-0.5 bg-red-500" style={{ borderTop: '2px dashed #ef4444' }}></div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Line Pressure Threshold</span>
-              </div>
-            )}
-            {showGasInjectionPressureThreshold && (
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-0.5 bg-amber-500" style={{ borderTop: '2px dashed #f59e0b' }}></div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Gas Injection Threshold</span>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
       {/* Chart */}
-      <div className="w-full" style={{ height: '600px' }}>
+      <div className="w-full outline-none relative" style={{ height: '650px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
-            data={data}
-            margin={{ top: 20, right: 50, left: 20, bottom: 80 }}
+            data={visibleData}
+            margin={{ top: 20, right: 50, left: 20, bottom: 130 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
 
             {/* Background phases - Using date strings for x-axis matching */}
-            {data.length > 0 && (
+            {visibleData.length > 0 && (
               <>
-                {/* Natural Phase: Days 0-7 */}
-                <ReferenceArea
-                  x1={data[0]?.date}
-                  x2={data[7]?.date}
-                  stroke="none"
-                  fill="#10b981"
-                  fillOpacity={0.2}
-                  ifOverflow="extendDomain"
-                />
+                {/* Natural Phase: Days 0-7 - Green background */}
+                {rangeStart <= 7 && rangeEnd >= 0 && (
+                  <ReferenceArea
+                    x1={visibleData[Math.max(0, 0 - rangeStart)]?.date}
+                    x2={visibleData[Math.min(visibleData.length - 1, Math.min(7, rangeEnd) - rangeStart)]?.date}
+                    stroke="none"
+                    fill="#10b981"
+                    fillOpacity={0.15}
+                  />
+                )}
 
-                {/* First Shut-In: Days 3-4 (overlays on Natural) */}
-                <ReferenceArea
-                  x1={data[3]?.date}
-                  x2={data[4]?.date}
-                  stroke="none"
-                  fill="#ef4444"
-                  fillOpacity={0.3}
-                  ifOverflow="extendDomain"
-                />
+                {/* First Shut-In: Days 3-4 (overlays on Natural) - Red background */}
+                {rangeStart <= 4 && rangeEnd >= 3 && (
+                  <ReferenceArea
+                    x1={visibleData[Math.max(0, 3 - rangeStart)]?.date}
+                    x2={visibleData[Math.min(visibleData.length - 1, Math.min(4, rangeEnd) - rangeStart)]?.date}
+                    stroke="none"
+                    fill="#ef4444"
+                    fillOpacity={0.15}
+                  />
+                )}
 
-                {/* Second Shut-In: Days 7-9 (transition period) */}
-                <ReferenceArea
-                  x1={data[7]?.date}
-                  x2={data[9]?.date}
-                  stroke="none"
-                  fill="#ef4444"
-                  fillOpacity={0.3}
-                  ifOverflow="extendDomain"
-                />
+                {/* Second Shut-In: Days 7-9 (transition period) - Red background */}
+                {rangeStart <= 9 && rangeEnd >= 7 && (
+                  <ReferenceArea
+                    x1={visibleData[Math.max(0, 7 - rangeStart)]?.date}
+                    x2={visibleData[Math.min(visibleData.length - 1, Math.min(9, rangeEnd) - rangeStart)]?.date}
+                    stroke="none"
+                    fill="#ef4444"
+                    fillOpacity={0.15}
+                  />
+                )}
 
-                {/* Continuous Phase: Days 9-21 */}
-                <ReferenceArea
-                  x1={data[9]?.date}
-                  x2={data[21]?.date}
-                  stroke="none"
-                  fill="#3b82f6"
-                  fillOpacity={0.2}
-                  ifOverflow="extendDomain"
-                />
+                {/* Continuous Phase: Days 9-21 - Blue background */}
+                {rangeEnd >= 9 && rangeStart <= 21 && (
+                  <ReferenceArea
+                    x1={visibleData[Math.max(0, 9 - rangeStart)]?.date}
+                    x2={visibleData[Math.min(visibleData.length - 1, Math.min(21, rangeEnd) - rangeStart)]?.date}
+                    stroke="none"
+                    fill="#3b82f6"
+                    fillOpacity={0.15}
+                  />
+                )}
               </>
             )}
 
@@ -363,7 +358,6 @@ export default function TimeSeriesChart({ well, metrics }: TimeSeriesChartProps)
 
             <XAxis
               dataKey="date"
-              label={{ value: 'Date', position: 'insideBottom', offset: -5 }}
               stroke="#6b7280"
               tick={{ fill: '#6b7280', fontSize: 9 }}
               angle={-45}
@@ -432,10 +426,71 @@ export default function TimeSeriesChart({ well, metrics }: TimeSeriesChartProps)
             })}
           </LineChart>
         </ResponsiveContainer>
+
+        {/* Time Range Slider - Inside Chart Container */}
+        <div className="absolute bottom-4 left-0 right-0 px-16 flex justify-center">
+          <div className="relative pt-2 pb-4 w-full max-w-2xl">
+            {/* Track background */}
+            <div className="absolute top-4 left-0 right-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+
+            {/* Selected range highlight */}
+            <div
+              className="absolute top-4 h-2 bg-blue-500 dark:bg-blue-600 rounded-lg pointer-events-none z-10"
+              style={{
+                left: `${(rangeStart / (data.length - 1)) * 100}%`,
+                right: `${100 - (rangeEnd / (data.length - 1)) * 100}%`
+              }}
+            ></div>
+
+            {/* Start slider */}
+            <input
+              type="range"
+              min="0"
+              max={data.length - 1}
+              value={rangeStart}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (value < rangeEnd) {
+                  setRangeStart(value);
+                }
+              }}
+              className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-30 range-slider-start"
+              style={{
+                top: '1rem',
+                pointerEvents: 'auto'
+              }}
+            />
+
+            {/* End slider */}
+            <input
+              type="range"
+              min="0"
+              max={data.length - 1}
+              value={rangeEnd}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (value > rangeStart) {
+                  setRangeEnd(value);
+                }
+              }}
+              className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-40 range-slider-end"
+              style={{
+                top: '1rem',
+                pointerEvents: 'auto'
+              }}
+            />
+
+            {/* Labels below slider */}
+            <div className="flex justify-between mt-8 text-xs text-gray-600 dark:text-gray-400">
+              <span>{data[rangeStart]?.date}</span>
+              <span>{data[rangeEnd]?.date}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Phase Details */}
-      <div className="-mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
           <h4 className="font-semibold text-green-800 dark:text-green-400 mb-1">Natural Phase</h4>
           <p className="text-sm text-green-600 dark:text-green-300">
@@ -455,6 +510,80 @@ export default function TimeSeriesChart({ well, metrics }: TimeSeriesChartProps)
           </p>
         </div>
       </div>
+
+      <style jsx>{`
+        div * {
+          outline: none !important;
+        }
+
+        svg {
+          outline: none !important;
+        }
+
+        input[type="range"] {
+          -webkit-appearance: none;
+          appearance: none;
+          pointer-events: none;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+          background: transparent;
+          height: 8px;
+        }
+
+        input[type="range"]::-moz-range-track {
+          background: transparent;
+          height: 8px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: #3b82f6;
+          cursor: grab;
+          border: 3px solid white;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          position: relative;
+          pointer-events: auto;
+          margin-top: -6px;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: #3b82f6;
+          cursor: grab;
+          border: 3px solid white;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          pointer-events: auto;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+          background: #2563eb;
+          transform: scale(1.15);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+          background: #2563eb;
+          transform: scale(1.15);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:active {
+          cursor: grabbing;
+          background: #1d4ed8;
+        }
+
+        input[type="range"]::-moz-range-thumb:active {
+          cursor: grabbing;
+          background: #1d4ed8;
+        }
+      `}</style>
     </div>
   );
 }

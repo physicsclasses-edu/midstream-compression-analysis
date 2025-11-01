@@ -16,7 +16,11 @@ const TimeSeriesChart = dynamic(() => import('./TimeSeriesChart'), {
   ),
 });
 
-export default function OilImpactContent() {
+interface OilImpactContentProps {
+  dateRange: { from: string; to: string };
+}
+
+export default function OilImpactContent({ dateRange }: OilImpactContentProps) {
   const [selectedWell, setSelectedWell] = useState('');
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
   const [isWellDropdownOpen, setIsWellDropdownOpen] = useState(false);
@@ -237,7 +241,7 @@ export default function OilImpactContent() {
 
       {/* Time-Series Chart */}
       {showChart && (
-        <TimeSeriesChart well={appliedWell} metrics={appliedMetrics} />
+        <TimeSeriesChart well={appliedWell} metrics={appliedMetrics} dateRange={dateRange} />
       )}
 
       {/* Footer */}
