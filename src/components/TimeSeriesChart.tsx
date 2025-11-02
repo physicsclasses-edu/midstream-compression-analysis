@@ -2,7 +2,7 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea, ReferenceLine } from 'recharts';
 import { useState, useEffect, useRef } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface TimeSeriesChartProps {
   well: string;
@@ -165,8 +165,23 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
   const [rangeStart, setRangeStart] = useState(0);
   const [rangeEnd, setRangeEnd] = useState(21);
 
+  // Legend toggle state - track which metrics are visible
+  const [visibleMetrics, setVisibleMetrics] = useState<{[key: string]: boolean}>(() =>
+    metrics.reduce((acc, metric) => ({ ...acc, [metric]: true }), {})
+  );
+
   // Generate data immediately on render (deterministic, so SSR-safe)
   const data = generateTimeSeriesData(metrics, well);
+
+  // Update visible metrics when metrics prop changes
+  useEffect(() => {
+    setVisibleMetrics(metrics.reduce((acc, metric) => ({ ...acc, [metric]: true }), {}));
+  }, [metrics.join(',')]);
+
+  // Toggle metric visibility
+  const toggleMetric = (metric: string) => {
+    setVisibleMetrics(prev => ({ ...prev, [metric]: !prev[metric] }));
+  };
 
   // Update range when dateRange changes
   useEffect(() => {
@@ -233,7 +248,8 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
   };
 
   return (
-    <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700" style={{ outline: 'none' }}>
+    <>
+    <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none" style={{ outline: 'none' }} tabIndex={-1}>
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
@@ -264,11 +280,11 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
       </div>
 
       {/* Chart */}
-      <div className="w-full outline-none relative" style={{ height: '650px' }}>
+      <div className="w-full outline-none" style={{ height: '500px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleData}
-            margin={{ top: 20, right: 50, left: 20, bottom: 130 }}
+            margin={{ top: 20, right: 50, left: 20, bottom: 0 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
 
@@ -348,7 +364,9 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                 yAxisId="right"
                 label={{
                   value: 'Gas Injection Threshold (1000)',
-                  position: 'insideTopRight',
+                  position: 'insideRight',
+                  dy: -15,
+                  dx: -10,
                   fill: '#f59e0b',
                   fontSize: 12,
                   fontWeight: 'bold'
@@ -402,13 +420,9 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
             )}
 
             <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{ paddingTop: '20px' }}
-              iconType="line"
-            />
 
-            {/* Render lines for each metric */}
-            {metrics.map((metric) => {
+            {/* Render lines for each visible metric */}
+            {metrics.filter(metric => visibleMetrics[metric]).map((metric) => {
               const isRightAxis = RIGHT_AXIS_METRICS.includes(metric);
               return (
                 <Line
@@ -426,89 +440,154 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
             })}
           </LineChart>
         </ResponsiveContainer>
-
-        {/* Time Range Slider - Inside Chart Container */}
-        <div className="absolute bottom-4 left-0 right-0 px-16 flex justify-center">
-          <div className="relative pt-2 pb-4 w-full max-w-2xl">
-            {/* Track background */}
-            <div className="absolute top-4 left-0 right-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-
-            {/* Selected range highlight */}
-            <div
-              className="absolute top-4 h-2 bg-blue-500 dark:bg-blue-600 rounded-lg pointer-events-none z-10"
-              style={{
-                left: `${(rangeStart / (data.length - 1)) * 100}%`,
-                right: `${100 - (rangeEnd / (data.length - 1)) * 100}%`
-              }}
-            ></div>
-
-            {/* Start slider */}
-            <input
-              type="range"
-              min="0"
-              max={data.length - 1}
-              value={rangeStart}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value < rangeEnd) {
-                  setRangeStart(value);
-                }
-              }}
-              className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-30 range-slider-start"
-              style={{
-                top: '1rem',
-                pointerEvents: 'auto'
-              }}
-            />
-
-            {/* End slider */}
-            <input
-              type="range"
-              min="0"
-              max={data.length - 1}
-              value={rangeEnd}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value > rangeStart) {
-                  setRangeEnd(value);
-                }
-              }}
-              className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-40 range-slider-end"
-              style={{
-                top: '1rem',
-                pointerEvents: 'auto'
-              }}
-            />
-
-            {/* Labels below slider */}
-            <div className="flex justify-between mt-8 text-xs text-gray-600 dark:text-gray-400">
-              <span>{data[rangeStart]?.date}</span>
-              <span>{data[rangeEnd]?.date}</span>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Phase Details */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-          <h4 className="font-semibold text-green-800 dark:text-green-400 mb-1">Natural Phase</h4>
-          <p className="text-sm text-green-600 dark:text-green-300">
-            {data[0]?.date} to {data[7]?.date}: Well producing naturally with gradual decline
-          </p>
+      {/* Time Range Slider */}
+      <div className="px-16 flex justify-center items-center gap-4 -mt-8">
+        {/* Left Arrow Button */}
+        <button
+          onClick={() => {
+            if (rangeStart > 0) {
+              setRangeStart(rangeStart - 1);
+            }
+          }}
+          disabled={rangeStart === 0}
+          className="flex-shrink-0 p-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white transition-colors disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+          title="Previous day"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        <div className="relative pt-1 pb-1 w-full max-w-2xl mt-3">
+          {/* Track background */}
+          <div className="absolute top-2 left-0 right-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+
+          {/* Selected range highlight */}
+          <div
+            className="absolute top-2 h-2 bg-blue-500 dark:bg-blue-600 rounded-lg pointer-events-none z-10"
+            style={{
+              left: `${(rangeStart / (data.length - 1)) * 100}%`,
+              right: `${100 - (rangeEnd / (data.length - 1)) * 100}%`
+            }}
+          ></div>
+
+          {/* Start slider */}
+          <input
+            type="range"
+            min="0"
+            max={data.length - 1}
+            value={rangeStart}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              if (value < rangeEnd) {
+                setRangeStart(value);
+              }
+            }}
+            className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-30 range-slider-start"
+            style={{
+              top: '0.5rem',
+              pointerEvents: 'auto'
+            }}
+          />
+
+          {/* End slider */}
+          <input
+            type="range"
+            min="0"
+            max={data.length - 1}
+            value={rangeEnd}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              if (value > rangeStart) {
+                setRangeEnd(value);
+              }
+            }}
+            className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-40 range-slider-end"
+            style={{
+              top: '0.5rem',
+              pointerEvents: 'auto'
+            }}
+          />
+
+          {/* Labels below slider */}
+          <div className="flex justify-between mt-4 text-xs text-gray-600 dark:text-gray-400">
+            <span>{data[rangeStart]?.date}</span>
+            <span>{data[rangeEnd]?.date}</span>
+          </div>
         </div>
-        <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
-          <h4 className="font-semibold text-red-800 dark:text-red-400 mb-1">Shut-In Periods</h4>
-          <p className="text-sm text-red-600 dark:text-red-300">
-            {data[3]?.date} to {data[4]?.date}: 2-day maintenance | {data[7]?.date} to {data[9]?.date}: 3-day transition
-          </p>
-        </div>
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
-          <h4 className="font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Phase</h4>
-          <p className="text-sm text-blue-600 dark:text-blue-300">
-            {data[9]?.date} to {data[21]?.date}: Compression active, improved production
-          </p>
-        </div>
+
+        {/* Right Arrow Button */}
+        <button
+          onClick={() => {
+            if (rangeEnd < data.length - 1) {
+              setRangeEnd(rangeEnd + 1);
+            }
+          }}
+          disabled={rangeEnd === data.length - 1}
+          className="flex-shrink-0 p-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white transition-colors disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+          title="Next day"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Custom Interactive Legend */}
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+        {metrics.map((metric) => {
+          const isVisible = visibleMetrics[metric];
+          const color = METRIC_COLORS[metric] || '#6b7280';
+
+          return (
+            <button
+              key={metric}
+              onClick={() => toggleMetric(metric)}
+              className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"
+            >
+              <svg width="18" height="10" className="flex-shrink-0">
+                {/* Left line */}
+                <line
+                  x1="0"
+                  y1="5"
+                  x2="5"
+                  y2="5"
+                  stroke={color}
+                  strokeWidth="2"
+                  opacity={isVisible ? 1 : 0.3}
+                />
+                {/* Center hollow circle */}
+                <circle
+                  cx="9"
+                  cy="5"
+                  r="3"
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="2"
+                  opacity={isVisible ? 1 : 0.3}
+                />
+                {/* Right line */}
+                <line
+                  x1="13"
+                  y1="5"
+                  x2="18"
+                  y2="5"
+                  stroke={color}
+                  strokeWidth="2"
+                  opacity={isVisible ? 1 : 0.3}
+                />
+              </svg>
+              <span
+                className="text-sm"
+                style={{
+                  color: isVisible ? color : color,
+                  opacity: isVisible ? 1 : 0.4,
+                  textDecoration: isVisible ? 'none' : 'line-through'
+                }}
+              >
+                {metric}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <style jsx>{`
@@ -516,8 +595,34 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
           outline: none !important;
         }
 
+        div:focus {
+          outline: none !important;
+          box-shadow: none !important;
+        }
+
         svg {
           outline: none !important;
+        }
+
+        svg:focus {
+          outline: none !important;
+        }
+
+        .recharts-wrapper {
+          outline: none !important;
+        }
+
+        .recharts-surface {
+          outline: none !important;
+        }
+
+        * {
+          outline: none !important;
+        }
+
+        *:focus {
+          outline: none !important;
+          box-shadow: none !important;
         }
 
         input[type="range"] {
@@ -585,5 +690,28 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
         }
       `}</style>
     </div>
+
+    {/* Phase Details - Outside fullscreen container */}
+    <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+        <h4 className="font-semibold text-green-800 dark:text-green-400 mb-1">Natural Phase</h4>
+        <p className="text-sm text-green-600 dark:text-green-300">
+          {data[0]?.date} to {data[7]?.date}: Well producing naturally with gradual decline
+        </p>
+      </div>
+      <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
+        <h4 className="font-semibold text-red-800 dark:text-red-400 mb-1">Shut-In Periods</h4>
+        <p className="text-sm text-red-600 dark:text-red-300">
+          {data[3]?.date} to {data[4]?.date}: 2-day maintenance | {data[7]?.date} to {data[9]?.date}: 3-day transition
+        </p>
+      </div>
+      <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+        <h4 className="font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Phase</h4>
+        <p className="text-sm text-blue-600 dark:text-blue-300">
+          {data[9]?.date} to {data[21]?.date}: Compression active, improved production
+        </p>
+      </div>
+    </div>
+  </>
   );
 }

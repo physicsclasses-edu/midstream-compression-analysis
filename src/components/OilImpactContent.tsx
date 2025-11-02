@@ -188,39 +188,6 @@ export default function OilImpactContent({ dateRange }: OilImpactContentProps) {
           </div>
         </div>
 
-        {/* Selected Metrics Tags */}
-        {selectedMetrics.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Selected Metrics:
-              </span>
-              <button
-                onClick={() => setSelectedMetrics([])}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-              >
-                Clear all
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {selectedMetrics.map((metric) => (
-                <span
-                  key={metric}
-                  className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 rounded-full text-sm"
-                >
-                  {metric}
-                  <button
-                    onClick={() => removeMetric(metric)}
-                    className="hover:bg-blue-200 dark:hover:bg-blue-800/30 rounded-full p-0.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Action Buttons */}
         <div className="mt-6 flex gap-3">
           <button

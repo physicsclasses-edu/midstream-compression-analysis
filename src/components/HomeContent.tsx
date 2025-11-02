@@ -247,7 +247,13 @@ export default function HomeContent() {
           <div className="space-y-4">
             {mounted ? (
               <div className="relative h-48 bg-white dark:bg-gray-800 rounded-lg p-4">
-                <div className="grid grid-cols-12 gap-1 h-full relative">
+                {/* Y-Axis Label */}
+                <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center w-8">
+                  <span className={`text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap ${chartUnit === 'BBL' ? 'transform -rotate-90' : ''}`}>
+                    {chartUnit === 'BBL' ? 'BBL' : '$'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-12 gap-1 h-full relative ml-4">
                   {/* Cumulative Delta Line Graph */}
                   <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }} viewBox="0 0 100 100" preserveAspectRatio="none">
                     <polyline

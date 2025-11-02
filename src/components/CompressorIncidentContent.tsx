@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Clock, CheckCircle, XCircle, ChevronDown, X, Filter, Calendar } from 'lucide-react';
+import { AlertTriangle, Clock, CheckCircle, XCircle, ChevronDown, X, Filter } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type { Incident } from './CompressorTimeSeriesChart';
@@ -30,37 +30,11 @@ export default function CompressorIncidentContent({ dateRange }: CompressorIncid
   const [appliedCompressors, setAppliedCompressors] = useState<string[]>([]);
   const [appliedVariables, setAppliedVariables] = useState<string[]>([]);
 
-  // Day selection
-  const [selectedDay, setSelectedDay] = useState('');
-  const [isDayDropdownOpen, setIsDayDropdownOpen] = useState(false);
-  const [dateList, setDateList] = useState<string[]>([]);
-
   // Incident Timeline
   const [incidents, setIncidents] = useState<Incident[]>([]);
 
   const compressorDropdownRef = useRef<HTMLDivElement>(null);
   const variableDropdownRef = useRef<HTMLDivElement>(null);
-  const dayDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Generate date list when dateRange changes
-  useEffect(() => {
-    if (dateRange.from && dateRange.to) {
-      const start = new Date(dateRange.from);
-      const end = new Date(dateRange.to);
-      const dates: string[] = [];
-
-      const currentDate = new Date(start);
-      while (currentDate <= end) {
-        const dateString = `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`;
-        dates.push(dateString);
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
-      setDateList(dates);
-      // Reset selected day when date range changes
-      setSelectedDay('');
-    }
-  }, [dateRange]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -70,9 +44,6 @@ export default function CompressorIncidentContent({ dateRange }: CompressorIncid
       }
       if (variableDropdownRef.current && !variableDropdownRef.current.contains(event.target as Node)) {
         setIsVariableDropdownOpen(false);
-      }
-      if (dayDropdownRef.current && !dayDropdownRef.current.contains(event.target as Node)) {
-        setIsDayDropdownOpen(false);
       }
     };
 
@@ -124,11 +95,9 @@ export default function CompressorIncidentContent({ dateRange }: CompressorIncid
   };
 
   const applyFilters = () => {
-    if (selectedDay) {
-      setAppliedCompressors(selectedCompressors);
-      setAppliedVariables(selectedVariables);
-      setShowChart(true);
-    }
+    setAppliedCompressors(selectedCompressors);
+    setAppliedVariables(selectedVariables);
+    setShowChart(true);
   };
 
   const handleIncidentsGenerated = (generatedIncidents: Incident[]) => {
@@ -152,48 +121,11 @@ export default function CompressorIncidentContent({ dateRange }: CompressorIncid
     <div className="space-y-8">
       {/* Filter Section */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <Filter className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-              Analysis Filters
-            </h3>
-          </div>
-
-          {/* Day Selector Dropdown - Right aligned */}
-          <div className="relative" ref={dayDropdownRef}>
-            <button
-              onClick={() => setIsDayDropdownOpen(!isDayDropdownOpen)}
-              className="px-4 py-2 text-sm font-medium bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-            >
-              <Calendar className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-              <span className={selectedDay ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}>
-                {selectedDay || 'Select Day'}
-              </span>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isDayDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isDayDropdownOpen && dateList.length > 0 && (
-              <div className="absolute right-0 z-10 mt-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto min-w-[180px]">
-                {dateList.map((date) => (
-                  <button
-                    key={date}
-                    onClick={() => {
-                      setSelectedDay(date);
-                      setIsDayDropdownOpen(false);
-                    }}
-                    className={`w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600 ${
-                      selectedDay === date
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'text-gray-900 dark:text-white'
-                    }`}
-                  >
-                    {date}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="flex items-center gap-2 mb-6">
+          <Filter className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            Analysis Filters
+          </h3>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -280,80 +212,11 @@ export default function CompressorIncidentContent({ dateRange }: CompressorIncid
           </div>
         </div>
 
-        {/* Selected Items Tags */}
-        {(selectedCompressors.length > 0 || selectedVariables.length > 0) && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            {selectedCompressors.length > 0 && (
-              <div className="mb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Selected Compressors:
-                  </span>
-                  <button
-                    onClick={() => setSelectedCompressors([])}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                  >
-                    Clear all
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedCompressors.map((compressor) => (
-                    <span
-                      key={compressor}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 rounded-full text-sm"
-                    >
-                      {compressor}
-                      <button
-                        onClick={() => removeCompressor(compressor)}
-                        className="hover:bg-green-200 dark:hover:bg-green-800/30 rounded-full p-0.5"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {selectedVariables.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Selected Variables:
-                  </span>
-                  <button
-                    onClick={() => setSelectedVariables([])}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                  >
-                    Clear all
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedVariables.map((variable) => (
-                    <span
-                      key={variable}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 rounded-full text-sm"
-                    >
-                      {variable}
-                      <button
-                        onClick={() => removeVariable(variable)}
-                        className="hover:bg-blue-200 dark:hover:bg-blue-800/30 rounded-full p-0.5"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Action Buttons */}
         <div className="mt-6 flex gap-3">
           <button
             onClick={applyFilters}
-            disabled={selectedCompressors.length === 0 || selectedVariables.length === 0 || !selectedDay}
+            disabled={selectedCompressors.length === 0 || selectedVariables.length === 0}
             className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
           >
             Apply Filters
@@ -368,17 +231,17 @@ export default function CompressorIncidentContent({ dateRange }: CompressorIncid
       </div>
 
       {/* Compressor Time-Series Chart */}
-      {showChart && selectedDay && (
+      {showChart && (
         <CompressorTimeSeriesChart
           compressors={appliedCompressors}
           variables={appliedVariables}
-          selectedDay={selectedDay}
+          dateRange={dateRange}
           onIncidentsGenerated={handleIncidentsGenerated}
         />
       )}
 
       {/* Incident Timeline Card - Separate from chart */}
-      {showChart && selectedDay && incidents.length > 0 && (
+      {showChart && incidents.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
           <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
             Incident Timeline
