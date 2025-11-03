@@ -46,30 +46,33 @@ const seededRandom = (seed: number) => {
   return x - Math.floor(x);
 };
 
-// Generate random offline periods for compressors
+// Generate random offline periods for compressors across 21 days
 const generateOfflinePeriods = (compressors: string[]) => {
-  const offlinePeriods: { [key: string]: { start: number; end: number }[] } = {};
+  const offlinePeriods: { [key: string]: { day: number; start: number; end: number }[] } = {};
 
   compressors.forEach((compressor, index) => {
-    const periods: { start: number; end: number }[] = [];
+    const periods: { day: number; start: number; end: number }[] = [];
     const seed = index * 1000;
 
-    // Generate 1-3 random offline periods per compressor
-    const numPeriods = Math.floor(seededRandom(seed) * 3) + 1;
+    // Generate 2-4 random offline periods per compressor across 21 days
+    const numPeriods = Math.floor(seededRandom(seed) * 3) + 2;
 
     for (let i = 0; i < numPeriods; i++) {
-      const startHour = Math.floor(seededRandom(seed + i * 10) * 20); // Start between 0-19
+      const day = Math.floor(seededRandom(seed + i * 10) * 21); // Random day 0-20
+      const startHour = Math.floor(seededRandom(seed + i * 10 + 2) * 20); // Start between 0-19
       const duration = Math.floor(seededRandom(seed + i * 10 + 5) * 3) + 1; // Duration 1-3 hours
       const endHour = Math.min(startHour + duration, 23);
 
-      // Avoid overlapping periods
+      // Avoid overlapping periods on the same day
       const overlaps = periods.some(p =>
-        (startHour >= p.start && startHour <= p.end) ||
-        (endHour >= p.start && endHour <= p.end)
+        p.day === day && (
+          (startHour >= p.start && startHour <= p.end) ||
+          (endHour >= p.start && endHour <= p.end)
+        )
       );
 
       if (!overlaps) {
-        periods.push({ start: startHour, end: endHour });
+        periods.push({ day, start: startHour, end: endHour });
       }
     }
 
@@ -80,17 +83,22 @@ const generateOfflinePeriods = (compressors: string[]) => {
 };
 
 // Generate incident timeline
-const generateIncidentTimeline = (compressors: string[], offlinePeriods: { [key: string]: { start: number; end: number }[] }): Incident[] => {
+const generateIncidentTimeline = (compressors: string[], offlinePeriods: { [key: string]: { day: number; start: number; end: number }[] }): Incident[] => {
   const incidents: Incident[] = [];
+  const startDate = new Date(2024, 0, 1);
 
   // Add compressor offline incidents
   compressors.forEach((compressor) => {
     const periods = offlinePeriods[compressor] || [];
     periods.forEach((period) => {
       const duration = period.end - period.start;
+      const incidentDate = new Date(startDate);
+      incidentDate.setDate(incidentDate.getDate() + period.day);
+      const dateString = `${incidentDate.getMonth() + 1}/${incidentDate.getDate()}`;
+
       incidents.push({
-        startTime: `${period.start.toString().padStart(2, '0')}:00`,
-        endTime: `${period.end.toString().padStart(2, '0')}:00`,
+        startTime: `${dateString} ${period.start.toString().padStart(2, '0')}:00`,
+        endTime: `${dateString} ${period.end.toString().padStart(2, '0')}:00`,
         type: 'offline',
         compressor,
         description: `${compressor} - Compressor Offline`,
@@ -99,26 +107,38 @@ const generateIncidentTimeline = (compressors: string[], offlinePeriods: { [key:
     });
   });
 
-  // Add random capacity exceeded incidents
-  const numCapacityIncidents = Math.floor(seededRandom(999) * 2) + 1; // 1-2 incidents
+  // Add random capacity exceeded incidents across 21 days
+  const numCapacityIncidents = Math.floor(seededRandom(999) * 4) + 2; // 2-5 incidents
   for (let i = 0; i < numCapacityIncidents; i++) {
-    const startHour = Math.floor(seededRandom(888 + i * 50) * 18) + 2; // Start between 2-19
+    const day = Math.floor(seededRandom(888 + i * 50) * 21); // Random day 0-20
+    const startHour = Math.floor(seededRandom(888 + i * 50 + 10) * 18) + 2; // Start between 2-19
     const duration = Math.floor(seededRandom(888 + i * 50 + 20) * 3) + 2; // Duration 2-4 hours
     const endHour = Math.min(startHour + duration, 23);
 
+    const incidentDate = new Date(startDate);
+    incidentDate.setDate(incidentDate.getDate() + day);
+    const dateString = `${incidentDate.getMonth() + 1}/${incidentDate.getDate()}`;
+
     incidents.push({
-      startTime: `${startHour.toString().padStart(2, '0')}:00`,
-      endTime: `${endHour.toString().padStart(2, '0')}:00`,
+      startTime: `${dateString} ${startHour.toString().padStart(2, '0')}:00`,
+      endTime: `${dateString} ${endHour.toString().padStart(2, '0')}:00`,
       type: 'capacity',
       description: 'System Capacity Exceeded',
       duration: endHour - startHour
     });
   }
 
-  // Sort by start time
+  // Sort by day and start time
   incidents.sort((a, b) => {
-    const aHour = parseInt(a.startTime.split(':')[0]);
-    const bHour = parseInt(b.startTime.split(':')[0]);
+    const [aDate, aTime] = a.startTime.split(' ');
+    const [bDate, bTime] = b.startTime.split(' ');
+    const [aMonth, aDay] = aDate.split('/').map(Number);
+    const [bMonth, bDay] = bDate.split('/').map(Number);
+
+    if (aDay !== bDay) return aDay - bDay;
+
+    const aHour = parseInt(aTime.split(':')[0]);
+    const bHour = parseInt(bTime.split(':')[0]);
     return aHour - bHour;
   });
 
@@ -185,12 +205,11 @@ const generateDailyData = (compressors: string[], variables: string[], dateRange
   return data;
 };
 
-// Generate 24-hour time series data for single day or 2-day ranges
+// Generate 21 days of hourly time series data (504 data points)
 const generateHourlyData = (compressors: string[], variables: string[], dateRange: { from: string; to: string }, offlinePeriods: { [key: string]: { start: number; end: number }[] }) => {
   const data = [];
-  const fromDate = new Date(dateRange.from);
-  const toDate = new Date(dateRange.to);
-  const numDays = calculateDaysBetween(dateRange.from, dateRange.to);
+  const startDate = new Date(2024, 0, 1); // January 1, 2024
+  const totalDays = 21; // Always 21 days
 
   // Base values for different variables
   const variableBases: { [key: string]: { base: number, variance: number } } = {
@@ -200,40 +219,41 @@ const generateHourlyData = (compressors: string[], variables: string[], dateRang
     'Gas Temperature (F)': { base: 185, variance: 15 },
   };
 
-  // Generate hourly data for each day in the range (up to 2 days)
-  for (let dayOffset = 0; dayOffset < numDays; dayOffset++) {
-    const currentDate = new Date(fromDate);
-    currentDate.setDate(currentDate.getDate() + dayOffset);
-    const dateString = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-    // Generate data for each hour (00:00 to 23:00)
+  // Generate hourly data for 21 days
+  for (let day = 0; day <= totalDays; day++) {
     for (let hour = 0; hour < 24; hour++) {
-      const timeString = `${dateString} ${hour.toString().padStart(2, '0')}:00`;
-      const hourIndex = dayOffset * 24 + hour;
+      const currentDate = new Date(startDate);
+      currentDate.setDate(currentDate.getDate() + day);
+      currentDate.setHours(hour);
+      const dateString = `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`;
+      const timeString = `${hour.toString().padStart(2, '0')}:00`;
 
       const dataPoint: any = {
-        time: timeString,
-        hour: hourIndex,
-        displayHour: `${hour.toString().padStart(2, '0')}:00`,
+        day,
+        hour,
         date: dateString,
+        time: timeString,
+        dateTime: `${dateString} ${timeString}`,
+        timestamp: new Date(2024, 0, 1 + day, hour).toISOString(),
+        index: day * 24 + hour,
       };
 
       // Generate data for each compressor and variable combination
       compressors.forEach((compressor, compressorIndex) => {
-        // Check if compressor is offline during this hour (only on day 0 for simplicity)
-        const isOffline = dayOffset === 0 && offlinePeriods[compressor]?.some(
-          period => hour >= period.start && hour <= period.end
+        // Check if compressor is offline during this hour
+        const isOffline = offlinePeriods[compressor]?.some(
+          period => day === period.day && hour >= period.start && hour <= period.end
         );
 
         variables.forEach((variable, variableIndex) => {
           const config = variableBases[variable] || { base: 100, variance: 10 };
-          const seed = hourIndex * 1000 + compressorIndex * 100 + variableIndex * 10;
+          const seed = (day * 24 + hour) * 1000 + compressorIndex * 100 + variableIndex * 10;
           const variance = (seededRandom(seed) - 0.5) * config.variance;
 
           let value = 0;
 
           if (isOffline) {
-            // Compressor offline - value is 0 or null
+            // Compressor offline - value is 0
             value = 0;
           } else {
             // Add some hourly patterns (lower at night, higher during day)
@@ -282,31 +302,20 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
     setVisibleSeries(prev => ({ ...prev, [series]: !prev[series] }));
   };
 
-  // Calculate number of days in the date range
-  const numDays = calculateDaysBetween(dateRange.from, dateRange.to);
-  const showHourly = numDays <= 2;
-
   // Generate data immediately on render (deterministic, so SSR-safe)
+  // Always use hourly data for 21 days
   const offlinePeriods = generateOfflinePeriods(compressors);
-  const data = showHourly
-    ? generateHourlyData(compressors, variables, dateRange, offlinePeriods)
-    : generateDailyData(compressors, variables, dateRange, offlinePeriods);
+  const data = generateHourlyData(compressors, variables, dateRange, offlinePeriods);
   const incidents = generateIncidentTimeline(compressors, offlinePeriods);
 
-  // Time range slider state
+  // Time range slider state (in days: 0-21)
   const [rangeStart, setRangeStart] = useState(0);
-  const [rangeEnd, setRangeEnd] = useState(data.length - 1);
+  const [rangeEnd, setRangeEnd] = useState(21);
 
-  // Sync slider with dateRange changes
-  useEffect(() => {
-    if (data.length > 0) {
-      setRangeStart(0);
-      setRangeEnd(data.length - 1);
-    }
-  }, [data.length, dateRange.from, dateRange.to]);
-
-  // Calculate visible data based on slider range
-  const visibleData = data.slice(rangeStart, rangeEnd + 1);
+  // Calculate visible data based on slider range (convert day indices to hour indices)
+  const startHourIndex = rangeStart * 24;
+  const endHourIndex = (rangeEnd + 1) * 24;
+  const visibleData = data.slice(startHourIndex, endHourIndex);
 
   // Notify parent of incidents on mount/update
   useEffect(() => {
@@ -354,9 +363,13 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      // Extract full date and time from the data point
+      const dataPoint = payload[0].payload;
+      const displayLabel = dataPoint.dateTime || label;
+
       return (
         <div className="bg-white dark:bg-gray-800 p-4 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg min-w-[400px]">
-          <p className="font-semibold text-gray-900 dark:text-white mb-2">{showHourly ? 'Time' : 'Date'}: {label}</p>
+          <p className="font-semibold text-gray-900 dark:text-white mb-2">{displayLabel}</p>
           <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">{formatDateRange()}</p>
           <div className="space-y-1">
             {payload.map((entry: any, index: number) => {
@@ -382,7 +395,7 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
             Compressor Performance: {formatDateRange()}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {compressors.length} compressor{compressors.length > 1 ? 's' : ''} with {variables.length} variable{variables.length > 1 ? 's' : ''} {showHourly ? `over ${numDays} day${numDays > 1 ? 's' : ''} (hourly data)` : `over ${numDays} days (daily data)`}
+            Showing {compressors.length} compressor{compressors.length > 1 ? 's' : ''} with {variables.length} variable{variables.length > 1 ? 's' : ''} over 21 days with hourly data
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -470,13 +483,17 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
             )}
 
             <XAxis
-              dataKey={showHourly ? "time" : "date"}
+              dataKey="index"
               stroke="#6b7280"
               tick={{ fill: '#6b7280', fontSize: 9 }}
               angle={-45}
               textAnchor="end"
               height={80}
-              interval={showHourly ? (numDays === 1 ? 1 : 2) : 0}
+              ticks={visibleData.filter(d => d.hour === 0).map(d => d.index)}
+              tickFormatter={(value) => {
+                const dataPoint = visibleData.find(d => d.index === value);
+                return dataPoint?.date || '';
+              }}
             />
 
             {/* Left Y-Axis */}
@@ -567,8 +584,8 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
           <div
             className="absolute top-2 h-2 bg-blue-500 dark:bg-blue-600 rounded-lg pointer-events-none z-10"
             style={{
-              left: `${(rangeStart / (data.length - 1)) * 100}%`,
-              right: `${100 - (rangeEnd / (data.length - 1)) * 100}%`
+              left: `${(rangeStart / 21) * 100}%`,
+              right: `${100 - (rangeEnd / 21) * 100}%`
             }}
           ></div>
 
@@ -576,7 +593,7 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
           <input
             type="range"
             min="0"
-            max={data.length - 1}
+            max={21}
             value={rangeStart}
             onChange={(e) => {
               const value = Number(e.target.value);
@@ -595,7 +612,7 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
           <input
             type="range"
             min="0"
-            max={data.length - 1}
+            max={21}
             value={rangeEnd}
             onChange={(e) => {
               const value = Number(e.target.value);
@@ -612,19 +629,19 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
 
           {/* Labels below slider */}
           <div className="flex justify-between mt-4 text-xs text-gray-600 dark:text-gray-400">
-            <span>{showHourly ? data[rangeStart]?.time : data[rangeStart]?.date}</span>
-            <span>{showHourly ? data[rangeEnd]?.time : data[rangeEnd]?.date}</span>
+            <span>{data[startHourIndex]?.date}</span>
+            <span>{data[Math.min(endHourIndex - 1, data.length - 1)]?.date}</span>
           </div>
         </div>
 
         {/* Right Arrow Button */}
         <button
           onClick={() => {
-            if (rangeEnd < data.length - 1) {
+            if (rangeEnd < 21) {
               setRangeEnd(rangeEnd + 1);
             }
           }}
-          disabled={rangeEnd === data.length - 1}
+          disabled={rangeEnd === 21}
           className="flex-shrink-0 p-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white transition-colors disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
           title="Next day"
         >

@@ -41,7 +41,7 @@ const seededRandom = (seed: number) => {
   return x - Math.floor(x);
 };
 
-// Generate realistic time-series data
+// Generate realistic time-series data with hourly granularity
 const generateTimeSeriesData = (metrics: string[], well: string) => {
   const data = [];
   const totalDays = 21; // 21 days
@@ -62,98 +62,100 @@ const generateTimeSeriesData = (metrics: string[], well: string) => {
   };
 
   // Store oil production values for prediction matching
-  const oilProductionValues: { [key: number]: number } = {};
+  const oilProductionValues: { [key: string]: number } = {};
 
-  // First pass: calculate Oil Production Rate
+  // First pass: calculate Oil Production Rate for each hour
   for (let day = 0; day <= totalDays; day++) {
-    const config = metricBases['Oil Production Rate'];
-    let value = config.base;
-
-    if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
-      // Shut-in periods (day 3-4: 2-day shut-in, day 7-9: 3-day shut-in)
-      value = 0;
-    } else {
-      if (day < 7) {
-        // Natural phase
-        const declineRate = 0.02;
-        value = config.base * (1 - declineRate * day);
-      } else if (day >= 9) {
-        // Continuous phase
-        const daysInContinuous = day - 9;
-        const improvementFactor = 1.15;
-        value = config.base * improvementFactor * (1 - 0.007 * daysInContinuous);
-        value *= 1.12; // boost factor
-      }
-      const variance = (seededRandom(day * 100) - 0.5) * config.variance;
-      value += variance;
-    }
-    oilProductionValues[day] = Math.max(0, Number(value.toFixed(2)));
-  }
-
-  // Second pass: generate all data
-  for (let day = 0; day <= totalDays; day++) {
-    const currentDate = new Date(startDate);
-    currentDate.setDate(currentDate.getDate() + day);
-    const dateString = `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`;
-
-    const dataPoint: any = {
-      day,
-      date: dateString,
-      time: `Day ${day}`,
-      timestamp: new Date(2024, 0, 1 + day).toISOString(),
-    };
-
-    metrics.forEach((metric) => {
-      const config = metricBases[metric] || { base: 100, unit: '', variance: 10 };
+    for (let hour = 0; hour < 24; hour++) {
+      const hourKey = `${day}-${hour}`;
+      const config = metricBases['Oil Production Rate'];
       let value = config.base;
 
-      // Special handling for Predicted Oil Production Rate
-      if (metric === 'Predicted Oil Production Rate') {
-        const actualValue = oilProductionValues[day];
-        // Make prediction close to actual in natural and continuous phases
-        if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
-          value = 0;
-        } else if (day < 3 || day >= 10) {
-          // Close match in early natural phase and stable continuous phase
-          value = actualValue + (seededRandom(day * 200 + 50) - 0.5) * 8; // Very close
-        } else {
-          // Moderate variance in transition regions
-          value = actualValue + (seededRandom(day * 200 + 100) - 0.5) * 20;
-        }
+      if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
+        // Shut-in periods
+        value = 0;
       } else {
-        // Check if we're in a shut-in period
-        if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
-          value = 0;
+        if (day < 7) {
+          // Natural phase
+          const declineRate = 0.02;
+          value = config.base * (1 - declineRate * (day + hour / 24));
+        } else if (day >= 9) {
+          // Continuous phase
+          const daysInContinuous = day - 9 + hour / 24;
+          const improvementFactor = 1.15;
+          value = config.base * improvementFactor * (1 - 0.007 * daysInContinuous);
+          value *= 1.12; // boost factor
+        }
+        const variance = (seededRandom((day * 24 + hour) * 100) - 0.5) * config.variance;
+        value += variance;
+      }
+      oilProductionValues[hourKey] = Math.max(0, Number(value.toFixed(2)));
+    }
+  }
+
+  // Second pass: generate hourly data
+  for (let day = 0; day <= totalDays; day++) {
+    for (let hour = 0; hour < 24; hour++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(currentDate.getDate() + day);
+      currentDate.setHours(hour);
+      const dateString = `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`;
+      const timeString = `${hour.toString().padStart(2, '0')}:00`;
+      const hourKey = `${day}-${hour}`;
+
+      const dataPoint: any = {
+        day,
+        hour,
+        date: dateString,
+        time: timeString,
+        dateTime: `${dateString} ${timeString}`,
+        timestamp: new Date(2024, 0, 1 + day, hour).toISOString(),
+        index: day * 24 + hour,
+      };
+
+      metrics.forEach((metric) => {
+        const config = metricBases[metric] || { base: 100, unit: '', variance: 10 };
+        let value = config.base;
+
+        // Special handling for Predicted Oil Production Rate
+        if (metric === 'Predicted Oil Production Rate') {
+          const actualValue = oilProductionValues[hourKey];
+          if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
+            value = 0;
+          } else if (day < 3 || day >= 10) {
+            value = actualValue + (seededRandom((day * 24 + hour) * 200 + 50) - 0.5) * 8;
+          } else {
+            value = actualValue + (seededRandom((day * 24 + hour) * 200 + 100) - 0.5) * 20;
+          }
         } else {
-          // Natural phase - gradual decline
-          if (day < 7) {
-            const declineRate = 0.02;
-            value = config.base * (1 - declineRate * day);
-          }
-          // Continuous phase - improved and more stable
-          else if (day >= 9) {
-            const daysInContinuous = day - 9;
-            const improvementFactor = 1.15; // 15% improvement
-            value = config.base * improvementFactor * (1 - 0.007 * daysInContinuous);
-          }
+          if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
+            value = 0;
+          } else {
+            if (day < 7) {
+              const declineRate = 0.02;
+              value = config.base * (1 - declineRate * (day + hour / 24));
+            } else if (day >= 9) {
+              const daysInContinuous = day - 9 + hour / 24;
+              const improvementFactor = 1.15;
+              value = config.base * improvementFactor * (1 - 0.007 * daysInContinuous);
+            }
 
-          // Add some realistic variance
-          const metricIndex = Object.keys(metricBases).indexOf(metric);
-          const variance = (seededRandom(day * 1000 + metricIndex * 100) - 0.5) * config.variance;
-          value += variance;
+            const metricIndex = Object.keys(metricBases).indexOf(metric);
+            const variance = (seededRandom((day * 24 + hour) * 1000 + metricIndex * 100) - 0.5) * config.variance;
+            value += variance;
 
-          // Special handling for production rates - they respond to compression
-          if (metric.includes('Production Rate') && metric !== 'Predicted Oil Production Rate' && day >= 9) {
-            const boostFactor = metric.includes('Oil') ? 1.12 : 1.08;
-            value *= boostFactor;
+            if (metric.includes('Production Rate') && metric !== 'Predicted Oil Production Rate' && day >= 9) {
+              const boostFactor = metric.includes('Oil') ? 1.12 : 1.08;
+              value *= boostFactor;
+            }
           }
         }
-      }
 
-      dataPoint[metric] = Math.max(0, Number(value.toFixed(2)));
-    });
+        dataPoint[metric] = Math.max(0, Number(value.toFixed(2)));
+      });
 
-    data.push(dataPoint);
+      data.push(dataPoint);
+    }
   }
 
   return data;
@@ -201,8 +203,10 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
     }
   }, [dateRange, data.length]);
 
-  // Get visible data based on range
-  const visibleData = data.slice(rangeStart, rangeEnd + 1);
+  // Get visible data based on range (convert day indices to hour indices)
+  const startHourIndex = rangeStart * 24;
+  const endHourIndex = (rangeEnd + 1) * 24;
+  const visibleData = data.slice(startHourIndex, endHourIndex);
 
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -233,9 +237,13 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      // Extract full date and time from the data point
+      const dataPoint = payload[0].payload;
+      const displayLabel = dataPoint.dateTime || label;
+
       return (
         <div className="bg-white dark:bg-gray-800 p-4 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
-          <p className="font-semibold text-gray-900 dark:text-white mb-2">{label}</p>
+          <p className="font-semibold text-gray-900 dark:text-white mb-2">{displayLabel}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} style={{ color: entry.color }} className="text-sm">
               {entry.name}: {entry.value}
@@ -249,7 +257,7 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
 
   return (
     <>
-    <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none" style={{ outline: 'none' }} tabIndex={-1}>
+      <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none" style={{ outline: 'none' }} tabIndex={-1}>
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
@@ -288,14 +296,14 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
 
-            {/* Background phases - Using date strings for x-axis matching */}
+            {/* Background phases - Using index for x-axis matching */}
             {visibleData.length > 0 && (
               <>
                 {/* Natural Phase: Days 0-7 - Green background */}
                 {rangeStart <= 7 && rangeEnd >= 0 && (
                   <ReferenceArea
-                    x1={visibleData[Math.max(0, 0 - rangeStart)]?.date}
-                    x2={visibleData[Math.min(visibleData.length - 1, Math.min(7, rangeEnd) - rangeStart)]?.date}
+                    x1={visibleData[Math.max(0, (0 - rangeStart) * 24)]?.index}
+                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(7, rangeEnd) - rangeStart) * 24 + 23)]?.index}
                     stroke="none"
                     fill="#10b981"
                     fillOpacity={0.15}
@@ -305,8 +313,8 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                 {/* First Shut-In: Days 3-4 (overlays on Natural) - Red background */}
                 {rangeStart <= 4 && rangeEnd >= 3 && (
                   <ReferenceArea
-                    x1={visibleData[Math.max(0, 3 - rangeStart)]?.date}
-                    x2={visibleData[Math.min(visibleData.length - 1, Math.min(4, rangeEnd) - rangeStart)]?.date}
+                    x1={visibleData[Math.max(0, (3 - rangeStart) * 24)]?.index}
+                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(4, rangeEnd) - rangeStart) * 24 + 23)]?.index}
                     stroke="none"
                     fill="#ef4444"
                     fillOpacity={0.15}
@@ -316,8 +324,8 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                 {/* Second Shut-In: Days 7-9 (transition period) - Red background */}
                 {rangeStart <= 9 && rangeEnd >= 7 && (
                   <ReferenceArea
-                    x1={visibleData[Math.max(0, 7 - rangeStart)]?.date}
-                    x2={visibleData[Math.min(visibleData.length - 1, Math.min(9, rangeEnd) - rangeStart)]?.date}
+                    x1={visibleData[Math.max(0, (7 - rangeStart) * 24)]?.index}
+                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(9, rangeEnd) - rangeStart) * 24 + 23)]?.index}
                     stroke="none"
                     fill="#ef4444"
                     fillOpacity={0.15}
@@ -327,8 +335,8 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                 {/* Continuous Phase: Days 9-21 - Blue background */}
                 {rangeEnd >= 9 && rangeStart <= 21 && (
                   <ReferenceArea
-                    x1={visibleData[Math.max(0, 9 - rangeStart)]?.date}
-                    x2={visibleData[Math.min(visibleData.length - 1, Math.min(21, rangeEnd) - rangeStart)]?.date}
+                    x1={visibleData[Math.max(0, (9 - rangeStart) * 24)]?.index}
+                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(21, rangeEnd) - rangeStart) * 24 + 23)]?.index}
                     stroke="none"
                     fill="#3b82f6"
                     fillOpacity={0.15}
@@ -375,13 +383,17 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
             )}
 
             <XAxis
-              dataKey="date"
+              dataKey="index"
               stroke="#6b7280"
               tick={{ fill: '#6b7280', fontSize: 9 }}
               angle={-45}
               textAnchor="end"
               height={80}
-              interval={0}
+              ticks={visibleData.filter(d => d.hour === 0).map(d => d.index)}
+              tickFormatter={(value) => {
+                const dataPoint = visibleData.find(d => d.index === value);
+                return dataPoint?.date || '';
+              }}
             />
 
             {/* Left Y-Axis */}
@@ -466,8 +478,8 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
           <div
             className="absolute top-2 h-2 bg-blue-500 dark:bg-blue-600 rounded-lg pointer-events-none z-10"
             style={{
-              left: `${(rangeStart / (data.length - 1)) * 100}%`,
-              right: `${100 - (rangeEnd / (data.length - 1)) * 100}%`
+              left: `${(rangeStart / 21) * 100}%`,
+              right: `${100 - (rangeEnd / 21) * 100}%`
             }}
           ></div>
 
@@ -475,7 +487,7 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
           <input
             type="range"
             min="0"
-            max={data.length - 1}
+            max={21}
             value={rangeStart}
             onChange={(e) => {
               const value = Number(e.target.value);
@@ -494,7 +506,7 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
           <input
             type="range"
             min="0"
-            max={data.length - 1}
+            max={21}
             value={rangeEnd}
             onChange={(e) => {
               const value = Number(e.target.value);
@@ -511,19 +523,19 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
 
           {/* Labels below slider */}
           <div className="flex justify-between mt-4 text-xs text-gray-600 dark:text-gray-400">
-            <span>{data[rangeStart]?.date}</span>
-            <span>{data[rangeEnd]?.date}</span>
+            <span>{data[startHourIndex]?.date}</span>
+            <span>{data[Math.min(endHourIndex - 1, data.length - 1)]?.date}</span>
           </div>
         </div>
 
         {/* Right Arrow Button */}
         <button
           onClick={() => {
-            if (rangeEnd < data.length - 1) {
+            if (rangeEnd < 21) {
               setRangeEnd(rangeEnd + 1);
             }
           }}
-          disabled={rangeEnd === data.length - 1}
+          disabled={rangeEnd === 21}
           className="flex-shrink-0 p-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white transition-colors disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
           title="Next day"
         >
@@ -689,29 +701,29 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
           background: #1d4ed8;
         }
       `}</style>
-    </div>
+      </div>
 
-    {/* Phase Details - Outside fullscreen container */}
-    <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-        <h4 className="font-semibold text-green-800 dark:text-green-400 mb-1">Natural Phase</h4>
-        <p className="text-sm text-green-600 dark:text-green-300">
-          {data[0]?.date} to {data[7]?.date}: Well producing naturally with gradual decline
-        </p>
+      {/* Phase Details - Outside fullscreen container */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+          <h4 className="font-semibold text-green-800 dark:text-green-400 mb-1">Natural Phase</h4>
+          <p className="text-sm text-green-600 dark:text-green-300">
+            {data[0]?.date} to {data[7 * 24]?.date}: Well producing naturally with gradual decline
+          </p>
+        </div>
+        <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
+          <h4 className="font-semibold text-red-800 dark:text-red-400 mb-1">Shut-In Periods</h4>
+          <p className="text-sm text-red-600 dark:text-red-300">
+            {data[3 * 24]?.date} to {data[4 * 24]?.date}: 2-day maintenance | {data[7 * 24]?.date} to {data[9 * 24]?.date}: 3-day transition
+          </p>
+        </div>
+        <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+          <h4 className="font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Phase</h4>
+          <p className="text-sm text-blue-600 dark:text-blue-300">
+            {data[9 * 24]?.date} to {data[data.length - 1]?.date}: Compression active, improved production
+          </p>
+        </div>
       </div>
-      <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
-        <h4 className="font-semibold text-red-800 dark:text-red-400 mb-1">Shut-In Periods</h4>
-        <p className="text-sm text-red-600 dark:text-red-300">
-          {data[3]?.date} to {data[4]?.date}: 2-day maintenance | {data[7]?.date} to {data[9]?.date}: 3-day transition
-        </p>
-      </div>
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
-        <h4 className="font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Phase</h4>
-        <p className="text-sm text-blue-600 dark:text-blue-300">
-          {data[9]?.date} to {data[21]?.date}: Compression active, improved production
-        </p>
-      </div>
-    </div>
-  </>
+    </>
   );
 }
