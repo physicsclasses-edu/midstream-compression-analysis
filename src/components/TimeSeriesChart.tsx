@@ -706,19 +706,19 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
       {/* Phase Details - Outside fullscreen container */}
       <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-          <h4 className="font-semibold text-green-800 dark:text-green-400 mb-1">Natural Phase</h4>
+          <h4 className="font-semibold text-green-800 dark:text-green-400 mb-1">Natural Flow</h4>
           <p className="text-sm text-green-600 dark:text-green-300">
             {data[0]?.date} to {data[7 * 24]?.date}: Well producing naturally with gradual decline
           </p>
         </div>
         <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
-          <h4 className="font-semibold text-red-800 dark:text-red-400 mb-1">Shut-In Periods</h4>
+          <h4 className="font-semibold text-red-800 dark:text-red-400 mb-1">Shut-in</h4>
           <p className="text-sm text-red-600 dark:text-red-300">
             {data[3 * 24]?.date} to {data[4 * 24]?.date}: 2-day maintenance | {data[7 * 24]?.date} to {data[9 * 24]?.date}: 3-day transition
           </p>
         </div>
         <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
-          <h4 className="font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Phase</h4>
+          <h4 className="font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Gas Lift</h4>
           <p className="text-sm text-blue-600 dark:text-blue-300">
             {data[9 * 24]?.date} to {data[data.length - 1]?.date}: Compression active, improved production
           </p>
