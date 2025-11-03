@@ -561,21 +561,7 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
       </div>
 
       {/* Time Range Slider */}
-      <div className="px-16 flex justify-center items-center gap-4 -mt-8">
-        {/* Left Arrow Button */}
-        <button
-          onClick={() => {
-            if (rangeStart > 0) {
-              setRangeStart(rangeStart - 1);
-            }
-          }}
-          disabled={rangeStart === 0}
-          className="flex-shrink-0 p-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white transition-colors disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-          title="Previous day"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-
+      <div className="px-16 flex justify-center items-center -mt-8">
         <div className="relative pt-1 pb-1 w-full max-w-2xl mt-3">
           {/* Track background */}
           <div className="absolute top-2 left-0 right-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
@@ -633,20 +619,6 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
             <span>{data[Math.min(endHourIndex - 1, data.length - 1)]?.date}</span>
           </div>
         </div>
-
-        {/* Right Arrow Button */}
-        <button
-          onClick={() => {
-            if (rangeEnd < 21) {
-              setRangeEnd(rangeEnd + 1);
-            }
-          }}
-          disabled={rangeEnd === 21}
-          className="flex-shrink-0 p-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white transition-colors disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-          title="Next day"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
       </div>
 
       {/* Custom Interactive Legend */}
