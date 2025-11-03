@@ -155,7 +155,7 @@ const calculateDaysBetween = (from: string, to: string): number => {
 };
 
 // Generate daily data for multi-day ranges (more than 2 days)
-const generateDailyData = (compressors: string[], variables: string[], dateRange: { from: string; to: string }, offlinePeriods: { [key: string]: { start: number; end: number }[] }) => {
+const generateDailyData = (compressors: string[], variables: string[], dateRange: { from: string; to: string }, offlinePeriods: { [key: string]: { day: number; start: number; end: number }[] }) => {
   const data = [];
   const fromDate = new Date(dateRange.from);
   const toDate = new Date(dateRange.to);
@@ -206,7 +206,7 @@ const generateDailyData = (compressors: string[], variables: string[], dateRange
 };
 
 // Generate 21 days of hourly time series data (504 data points)
-const generateHourlyData = (compressors: string[], variables: string[], dateRange: { from: string; to: string }, offlinePeriods: { [key: string]: { start: number; end: number }[] }) => {
+const generateHourlyData = (compressors: string[], variables: string[], dateRange: { from: string; to: string }, offlinePeriods: { [key: string]: { day: number; start: number; end: number }[] }) => {
   const data = [];
   const startDate = new Date(2024, 0, 1); // January 1, 2024
   const totalDays = 21; // Always 21 days
