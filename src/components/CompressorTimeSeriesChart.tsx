@@ -292,6 +292,9 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
     allSeries.reduce((acc, series) => ({ ...acc, [series]: true }), {})
   );
 
+  // Hover state - track which series is being hovered
+  const [hoveredSeries, setHoveredSeries] = useState<string | null>(null);
+
   // Update visible series when compressors or variables change
   useEffect(() => {
     setVisibleSeries(allSeries.reduce((acc, series) => ({ ...acc, [series]: true }), {}));
@@ -541,6 +544,8 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
                 // Only render if visible
                 if (!visibleSeries[key]) return null;
 
+                const opacity = hoveredSeries === null ? 1 : hoveredSeries === key ? 1 : 0.2;
+
                 return (
                   <Line
                     key={key}
@@ -548,6 +553,7 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
                     dataKey={key}
                     stroke={color}
                     strokeWidth={2}
+                    strokeOpacity={opacity}
                     dot={false}
                     activeDot={{ r: 4 }}
                     name={key}
@@ -631,6 +637,8 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
             <button
               key={series}
               onClick={() => toggleSeries(series)}
+              onMouseEnter={() => setHoveredSeries(series)}
+              onMouseLeave={() => setHoveredSeries(null)}
               className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"
             >
               <svg width="18" height="10" className="flex-shrink-0">

@@ -172,6 +172,9 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
     metrics.reduce((acc, metric) => ({ ...acc, [metric]: true }), {})
   );
 
+  // Hover state - track which metric is being hovered
+  const [hoveredMetric, setHoveredMetric] = useState<string | null>(null);
+
   // Generate data immediately on render (deterministic, so SSR-safe)
   const data = generateTimeSeriesData(metrics, well);
 
@@ -436,6 +439,7 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
             {/* Render lines for each visible metric */}
             {metrics.filter(metric => visibleMetrics[metric]).map((metric) => {
               const isRightAxis = RIGHT_AXIS_METRICS.includes(metric);
+              const opacity = hoveredMetric === null ? 1 : hoveredMetric === metric ? 1 : 0.2;
               return (
                 <Line
                   key={metric}
@@ -443,6 +447,7 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                   dataKey={metric}
                   stroke={METRIC_COLORS[metric] || '#6b7280'}
                   strokeWidth={2}
+                  strokeOpacity={opacity}
                   dot={false}
                   activeDot={{ r: 4 }}
                   name={metric}
@@ -526,6 +531,8 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
             <button
               key={metric}
               onClick={() => toggleMetric(metric)}
+              onMouseEnter={() => setHoveredMetric(metric)}
+              onMouseLeave={() => setHoveredMetric(null)}
               className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"
             >
               <svg width="18" height="10" className="flex-shrink-0">
