@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Midstream Compression Analysis",
+  title: "Midstream Analysis",
   description: "Oil & Gas compression monitoring and analysis system",
 };
 

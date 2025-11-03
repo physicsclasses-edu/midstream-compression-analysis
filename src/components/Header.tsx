@@ -22,7 +22,7 @@ export default function Header() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-              Midstream Compression Analysis
+              Midstream Analysis
             </h1>
           </div>
 
