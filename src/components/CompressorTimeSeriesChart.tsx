@@ -335,7 +335,9 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   // Compressor selection (multi-select)
-  const [selectedCompressors, setSelectedCompressors] = useState<string[]>([availableCompressors[0]] || []);
+  const [selectedCompressors, setSelectedCompressors] = useState<string[]>(
+    availableCompressors[0] ? [availableCompressors[0]] : []
+  );
   const [isCompressorDropdownOpen, setIsCompressorDropdownOpen] = useState(false);
   const compressorDropdownRef = useRef<HTMLDivElement>(null);
 
