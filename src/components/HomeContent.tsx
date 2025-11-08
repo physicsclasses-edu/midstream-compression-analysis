@@ -3,7 +3,11 @@
 import { TrendingDown, AlertTriangle, TrendingUp, ChevronDown, ZoomIn, ZoomOut, Move, MapPin, BarChart3 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-export default function HomeContent() {
+interface HomeContentProps {
+  dateRange?: { from: string; to: string };
+}
+
+export default function HomeContent({ dateRange }: HomeContentProps) {
   const [benchmarkPrice, setBenchmarkPrice] = useState(75.50);
   const [chartUnit, setChartUnit] = useState<'BBL' | '$'>('BBL');
   const [mounted, setMounted] = useState(false);
@@ -87,6 +91,44 @@ export default function HomeContent() {
     };
   });
 
+  // Filter chart data based on date range from navigation calendar
+  // Compare by month name, extracting months from the date range
+  const filteredChartData = (dateRange?.from && dateRange?.to)
+    ? (() => {
+        const fromDate = new Date(dateRange.from);
+        const toDate = new Date(dateRange.to);
+
+        // Get all months in the date range
+        const monthsInRange: string[] = [];
+        const currentDate = new Date(fromDate);
+
+        while (currentDate <= toDate) {
+          const monthName = currentDate.toLocaleDateString('en-US', { month: 'short' });
+          if (!monthsInRange.includes(monthName)) {
+            monthsInRange.push(monthName);
+          }
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+
+        return chartData.filter(item => monthsInRange.includes(item.month));
+      })()
+    : chartData;
+
+  // Get the year(s) from date range for x-axis label
+  const getYearLabel = () => {
+    if (!dateRange?.from || !dateRange?.to) return '2024';
+
+    const fromDate = new Date(dateRange.from);
+    const toDate = new Date(dateRange.to);
+    const fromYear = fromDate.getFullYear();
+    const toYear = toDate.getFullYear();
+
+    if (fromYear === toYear) {
+      return fromYear.toString();
+    }
+    return `${fromYear}-${toYear}`;
+  };
+
   // Static well positions and statuses based on Houston geography
   const wellsData = [
     // Ship Channel area wells (Southeast Houston)
@@ -137,24 +179,26 @@ export default function HomeContent() {
       icon: TrendingDown,
       color: 'text-red-600 dark:text-red-400',
       bgColor: 'bg-red-100 dark:bg-red-900/20',
-      borderColor: 'border-l-red-500 dark:border-l-red-400',
+      borderColor: 'border-l-[#2F80ED] dark:border-l-[#4C9AFF]',
       hasDropdown: true,
     },
     {
       label: 'Line Pressure Too High',
       value: '160h',
+      wellsAffected: 8,
       icon: AlertTriangle,
-      color: 'text-orange-600 dark:text-orange-400',
-      bgColor: 'bg-orange-100 dark:bg-orange-900/20',
-      borderColor: 'border-l-orange-500 dark:border-l-orange-400',
+      color: 'text-yellow-600 dark:text-yellow-400',
+      bgColor: 'bg-yellow-100 dark:bg-yellow-900/20',
+      borderColor: 'border-l-[#2F80ED] dark:border-l-[#4C9AFF]',
     },
     {
       label: 'Gas Injection Pressure Too Low',
       value: '87h',
+      wellsAffected: 7,
       icon: TrendingUp,
-      color: 'text-yellow-600 dark:text-yellow-400',
-      bgColor: 'bg-yellow-100 dark:bg-yellow-900/20',
-      borderColor: 'border-l-yellow-500 dark:border-l-yellow-400',
+      color: 'text-green-600 dark:text-green-400',
+      bgColor: 'bg-green-100 dark:bg-green-900/20',
+      borderColor: 'border-l-[#2F80ED] dark:border-l-[#4C9AFF]',
     },
   ];
 
@@ -201,9 +245,16 @@ export default function HomeContent() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {stat.value}
-                  </p>
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {stat.value}
+                    </p>
+                    {stat.wellsAffected && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {stat.wellsAffected} wells affected
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -212,7 +263,7 @@ export default function HomeContent() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 h-[400px] flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
               <BarChart3 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -233,73 +284,83 @@ export default function HomeContent() {
               </button>
               <button
                 onClick={() => setChartUnit('$')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                   chartUnit === '$'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                ${chartUnit === '$' ? `@ $${benchmarkPrice}` : ''}
+                $ @ ${benchmarkPrice}
               </button>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="flex-1 flex flex-col">
             {mounted ? (
-              <div className="relative h-48 bg-white dark:bg-gray-800 rounded-lg p-4">
+              <div className="relative flex-1 bg-white dark:bg-gray-800 rounded-lg p-4 pb-2">
                 {/* Y-Axis Label */}
-                <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center w-8">
-                  <span className={`text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap ${chartUnit === 'BBL' ? 'transform -rotate-90' : ''}`}>
-                    {chartUnit === 'BBL' ? 'BBL' : '$'}
-                  </span>
+                <div className="absolute left-0 top-0 bottom-6 flex items-center justify-center w-8">
+                  <div className="transform -rotate-90">
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {chartUnit === 'BBL' ? 'BBL' : '$'}
+                    </span>
+                  </div>
                 </div>
-                <div className="grid grid-cols-12 gap-1 h-full relative ml-4">
+                <div className="flex gap-1 h-[calc(100%-28px)] relative ml-4 mb-6" style={{ justifyContent: 'space-evenly' }}>
                   {/* Cumulative Delta Line Graph */}
-                  <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }} viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <polyline
-                      fill="none"
-                      stroke="#dc2626"
-                      strokeWidth="1.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      vectorEffect="non-scaling-stroke"
-                      points={chartData.map((item, index) => {
-                        const maxCumulativeDelta = Math.max(...chartData.map(d => Math.abs(d.cumulativeDelta)));
-                        const x = (index / (chartData.length - 1)) * 100;
-                        const deltaHeight = Math.abs(item.cumulativeDelta) / maxCumulativeDelta * 40;
-                        const y = 20 + (40 - deltaHeight);
-                        return `${x},${y}`;
-                      }).join(' ')}
-                    />
-                  </svg>
+                  {filteredChartData.length > 1 && (
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }} viewBox="0 0 100 100" preserveAspectRatio="none">
+                      <polyline
+                        fill="none"
+                        stroke="#FF7F0E"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
+                        points={filteredChartData.map((item, index) => {
+                          const maxCumulativeDelta = Math.max(...filteredChartData.map(d => Math.abs(d.cumulativeDelta)));
+                          const x = (index / (filteredChartData.length - 1)) * 100;
+                          const deltaHeight = Math.abs(item.cumulativeDelta) / maxCumulativeDelta * 40;
+                          const y = 20 + (40 - deltaHeight);
+                          return `${x},${y}`;
+                        }).join(' ')}
+                      />
+                    </svg>
+                  )}
 
-                  {chartData.map((item, index) => {
-                    const maxActual = Math.max(...chartData.map(d => d.actualValue));
-                    const maxPredicted = Math.max(...chartData.map(d => d.predictedValue));
+                  {filteredChartData.map((item, index) => {
+                    const maxActual = Math.max(...filteredChartData.map(d => d.actualValue));
+                    const maxPredicted = Math.max(...filteredChartData.map(d => d.predictedValue));
                     const maxValue = Math.max(maxActual, maxPredicted);
                     const actualHeight = Math.max((item.actualValue / maxValue) * 160, 2);
                     const predictedHeight = Math.max((item.predictedValue / maxValue) * 160, 2);
 
+                    // Calculate dynamic bar width based on number of filtered items
+                    const barWidth = filteredChartData.length <= 4 ? '16px' : filteredChartData.length <= 8 ? '12px' : '8px';
+
                     return (
                       <div
                         key={index}
-                        className="flex flex-col items-center h-full group cursor-pointer hover:shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-all duration-200 p-1 relative"
+                        className="flex flex-col items-center justify-end group cursor-pointer hover:shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-all duration-200 p-1 relative"
+                        style={{ height: '100%' }}
                         onMouseEnter={() => setHoveredMonth(index)}
                         onMouseLeave={() => setHoveredMonth(null)}
                       >
-                        <div className="flex-1 flex items-end justify-center space-x-1 pb-6">
+                        <div className="flex items-end justify-center space-x-1 mb-1" style={{ height: 'calc(100% - 20px)' }}>
                           <div
-                            className="bg-blue-500 rounded-t-sm min-h-[2px] group-hover:bg-blue-600 transition-colors duration-200 group-hover:shadow-md"
+                            className="rounded-t-sm min-h-[2px] transition-all duration-200 group-hover:shadow-md"
                             style={{
                               height: `${actualHeight}px`,
-                              width: '8px'
+                              width: barWidth,
+                              backgroundColor: '#2F80ED'
                             }}
                           />
                           <div
-                            className="bg-green-500 rounded-t-sm min-h-[2px] group-hover:bg-green-600 transition-colors duration-200 group-hover:shadow-md"
+                            className="rounded-t-sm min-h-[2px] transition-all duration-200 group-hover:shadow-md"
                             style={{
                               height: `${predictedHeight}px`,
-                              width: '8px'
+                              width: barWidth,
+                              backgroundColor: '#9CC2F9'
                             }}
                           />
                         </div>
@@ -323,7 +384,7 @@ export default function HomeContent() {
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#2F80ED' }}></div>
                                     <span className="text-xs text-gray-600 dark:text-gray-400">Actual</span>
                                   </div>
                                   <div className="text-right">
@@ -334,7 +395,7 @@ export default function HomeContent() {
 
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#9CC2F9' }}></div>
                                     <span className="text-xs text-gray-600 dark:text-gray-400">Predicted</span>
                                   </div>
                                   <div className="text-right">
@@ -346,7 +407,7 @@ export default function HomeContent() {
                                 <div className="border-t border-gray-200 dark:border-gray-600 pt-2">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-2">
-                                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#FF7F0E' }}></div>
                                       <span className="text-xs text-gray-600 dark:text-gray-400">Cumulative Δ</span>
                                     </div>
                                     <div className="text-right">
@@ -364,37 +425,46 @@ export default function HomeContent() {
                     );
                   })}
                 </div>
+                {/* X-Axis Year Label */}
+                <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 ml-4">
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {getYearLabel()}
+                  </span>
+                </div>
               </div>
             ) : (
-              <div className="h-48 flex items-center justify-center bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                 <p className="text-gray-500 dark:text-gray-400">Loading chart...</p>
               </div>
             )}
 
-            <div className="flex items-center justify-center space-x-6 pt-8">
+            <div className="flex items-center justify-center space-x-6 pt-2">
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Actual Production {chartUnit === 'BBL' ? '(BBL)' : '($)'}
-                </span>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#2F80ED' }}></div>
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Actual Production</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-500">{chartUnit === 'BBL' ? '(BBL)' : '($)'}</span>
+                </div>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Predicted Model {chartUnit === 'BBL' ? '(BBL)' : '($)'}
-                </span>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#9CC2F9' }}></div>
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Predicted Model</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-500">{chartUnit === 'BBL' ? '(BBL)' : '($)'}</span>
+                </div>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-4 h-0.5 bg-red-600 rounded-full"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Cumulative Delta {chartUnit === 'BBL' ? '(BBL)' : '($)'}
-                </span>
+                <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: '#FF7F0E' }}></div>
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Cumulative Delta</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-500">{chartUnit === 'BBL' ? '(BBL)' : '($)'}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 h-[400px] flex flex-col">
           <div className="flex items-center space-x-3 mb-6">
             <AlertTriangle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -403,25 +473,25 @@ export default function HomeContent() {
           </div>
 
           {mounted ? (
-            <div className="space-y-6">
+            <div className="space-y-11 flex-1 overflow-y-auto">
               {/* Compressor Offline */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">Compressor Offline</p>
-                  <p className="text-sm font-bold text-red-600 dark:text-red-400">15.2 hrs</p>
+                  <p className="text-sm font-bold" style={{ color: '#2F80ED' }}>15.2 hrs</p>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-2">
                   <div className="flex h-4 rounded-full overflow-hidden">
                     <div
-                      className="bg-red-500 dark:bg-red-400 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(12.8 / 15.2) * 100}%` }}
+                      className="flex items-center justify-center text-white text-xs font-medium transition-all hover:brightness-110"
+                      style={{ width: `${(12.8 / 15.2) * 100}%`, backgroundColor: '#2F80ED' }}
                       title="1 Compressor offline: 12.8 hrs"
                     >
                       {(12.8 / 15.2) * 100 > 15 ? '12.8h' : ''}
                     </div>
                     <div
-                      className="bg-red-300 dark:bg-red-600 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(2.4 / 15.2) * 100}%` }}
+                      className="flex items-center justify-center text-white text-xs font-medium transition-all hover:brightness-110"
+                      style={{ width: `${(2.4 / 15.2) * 100}%`, backgroundColor: '#9CC2F9' }}
                       title="2 Compressors offline: 2.4 hrs"
                     >
                       {(2.4 / 15.2) * 100 > 8 ? '2.4h' : ''}
@@ -430,11 +500,11 @@ export default function HomeContent() {
                 </div>
                 <div className="flex items-center space-x-4 text-xs">
                   <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-red-500 dark:bg-red-400 rounded"></div>
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#2F80ED' }}></div>
                     <span className="text-gray-600 dark:text-gray-400">1 Offline</span>
                   </div>
                   <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-red-300 dark:bg-red-600 rounded"></div>
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#9CC2F9' }}></div>
                     <span className="text-gray-600 dark:text-gray-400">2 Offline</span>
                   </div>
                 </div>
@@ -444,27 +514,27 @@ export default function HomeContent() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">Line Pressure Too High</p>
-                  <p className="text-sm font-bold text-orange-600 dark:text-orange-400">8.7 hrs</p>
+                  <p className="text-sm font-bold" style={{ color: '#2F80ED' }}>8.7 hrs</p>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-2">
                   <div className="flex h-4 rounded-full overflow-hidden">
                     <div
-                      className="bg-orange-500 dark:bg-orange-400 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(5.3 / 8.7) * 100}%` }}
+                      className="flex items-center justify-center text-white text-xs font-medium transition-all hover:brightness-110"
+                      style={{ width: `${(5.3 / 8.7) * 100}%`, backgroundColor: '#2F80ED' }}
                       title="All 3 compressors online: 5.3 hrs"
                     >
                       {(5.3 / 8.7) * 100 > 15 ? '5.3h' : ''}
                     </div>
                     <div
-                      className="bg-orange-400 dark:bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(2.8 / 8.7) * 100}%` }}
+                      className="flex items-center justify-center text-white text-xs font-medium transition-all hover:brightness-110"
+                      style={{ width: `${(2.8 / 8.7) * 100}%`, backgroundColor: '#9CC2F9' }}
                       title="1 Compressor offline: 2.8 hrs"
                     >
                       {(2.8 / 8.7) * 100 > 15 ? '2.8h' : ''}
                     </div>
                     <div
-                      className="bg-orange-300 dark:bg-orange-600 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(0.6 / 8.7) * 100}%` }}
+                      className="flex items-center justify-center text-white text-xs font-medium transition-all hover:brightness-110"
+                      style={{ width: `${(0.6 / 8.7) * 100}%`, backgroundColor: '#C6DEFF' }}
                       title="2 Compressors offline: 0.6 hrs"
                     >
                     </div>
@@ -472,15 +542,15 @@ export default function HomeContent() {
                 </div>
                 <div className="flex items-center space-x-4 text-xs">
                   <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-orange-500 dark:bg-orange-400 rounded"></div>
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#2F80ED' }}></div>
                     <span className="text-gray-600 dark:text-gray-400">All Online</span>
                   </div>
                   <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-orange-400 dark:bg-orange-500 rounded"></div>
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#9CC2F9' }}></div>
                     <span className="text-gray-600 dark:text-gray-400">1 Offline</span>
                   </div>
                   <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-orange-300 dark:bg-orange-600 rounded"></div>
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#C6DEFF' }}></div>
                     <span className="text-gray-600 dark:text-gray-400">2 Offline</span>
                   </div>
                 </div>
@@ -490,27 +560,27 @@ export default function HomeContent() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">Gas Injection Pressure Too Low</p>
-                  <p className="text-sm font-bold text-yellow-600 dark:text-yellow-400">6.1 hrs</p>
+                  <p className="text-sm font-bold" style={{ color: '#2F80ED' }}>6.1 hrs</p>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-2">
                   <div className="flex h-4 rounded-full overflow-hidden">
                     <div
-                      className="bg-yellow-500 dark:bg-yellow-400 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(2.9 / 6.1) * 100}%` }}
+                      className="flex items-center justify-center text-white text-xs font-medium transition-all hover:brightness-110"
+                      style={{ width: `${(2.9 / 6.1) * 100}%`, backgroundColor: '#2F80ED' }}
                       title="All 3 compressors online: 2.9 hrs"
                     >
                       {(2.9 / 6.1) * 100 > 15 ? '2.9h' : ''}
                     </div>
                     <div
-                      className="bg-yellow-400 dark:bg-yellow-500 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(2.4 / 6.1) * 100}%` }}
+                      className="flex items-center justify-center text-white text-xs font-medium transition-all hover:brightness-110"
+                      style={{ width: `${(2.4 / 6.1) * 100}%`, backgroundColor: '#9CC2F9' }}
                       title="1 Compressor offline: 2.4 hrs"
                     >
                       {(2.4 / 6.1) * 100 > 15 ? '2.4h' : ''}
                     </div>
                     <div
-                      className="bg-yellow-300 dark:bg-yellow-600 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(0.8 / 6.1) * 100}%` }}
+                      className="flex items-center justify-center text-white text-xs font-medium transition-all hover:brightness-110"
+                      style={{ width: `${(0.8 / 6.1) * 100}%`, backgroundColor: '#C6DEFF' }}
                       title="2 Compressors offline: 0.8 hrs"
                     >
                     </div>
@@ -518,22 +588,22 @@ export default function HomeContent() {
                 </div>
                 <div className="flex items-center space-x-4 text-xs">
                   <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-yellow-500 dark:bg-yellow-400 rounded"></div>
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#2F80ED' }}></div>
                     <span className="text-gray-600 dark:text-gray-400">All Online</span>
                   </div>
                   <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-yellow-400 dark:bg-yellow-500 rounded"></div>
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#9CC2F9' }}></div>
                     <span className="text-gray-600 dark:text-gray-400">1 Offline</span>
                   </div>
                   <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 bg-yellow-300 dark:bg-yellow-600 rounded"></div>
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: '#C6DEFF' }}></div>
                     <span className="text-gray-600 dark:text-gray-400">2 Offline</span>
                   </div>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1">
               <div className="h-16 bg-gray-50 dark:bg-gray-700/50 rounded-lg animate-pulse"></div>
               <div className="h-16 bg-gray-50 dark:bg-gray-700/50 rounded-lg animate-pulse"></div>
               <div className="h-16 bg-gray-50 dark:bg-gray-700/50 rounded-lg animate-pulse"></div>
@@ -558,7 +628,7 @@ export default function HomeContent() {
               <span className="text-sm text-gray-600 dark:text-gray-400">Operational (18)</span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
               <span className="text-sm text-gray-600 dark:text-gray-400">Warning (5)</span>
             </div>
             <div className="flex items-center space-x-2">
@@ -569,7 +639,7 @@ export default function HomeContent() {
         </div>
 
         {mounted ? (
-          <div className="relative h-96 bg-green-200 dark:bg-green-800 rounded-lg overflow-hidden">
+          <div className="relative h-96 bg-slate-700 dark:bg-gray-900 rounded-lg overflow-visible">
             {/* Zoom Controls */}
             <div className="absolute top-4 right-4 z-30 flex flex-col space-y-2">
               <button
@@ -614,43 +684,45 @@ export default function HomeContent() {
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
+              {/* Map Background Wrapper with Overflow Hidden */}
+              <div className="absolute inset-0 overflow-hidden rounded-lg">
               {/* Realistic Satellite Map */}
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-300 dark:from-amber-700 dark:via-yellow-800 dark:to-amber-800">
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-600 via-stone-600 to-slate-700 dark:from-gray-800 dark:via-gray-700 dark:to-gray-900">
 
                 {/* Natural Terrain Texture */}
-                <div className="absolute inset-0 opacity-40">
-                  {/* Large vegetation patches */}
-                  <div className="absolute top-[5%] left-[10%] w-20 h-16 bg-green-700 dark:bg-green-900 rounded-full transform rotate-12 opacity-50"></div>
-                  <div className="absolute top-[15%] left-[40%] w-24 h-18 bg-green-800 dark:bg-green-950 rounded-full transform -rotate-6 opacity-40"></div>
-                  <div className="absolute top-[25%] right-[20%] w-18 h-14 bg-green-700 dark:bg-green-900 rounded-full transform rotate-45 opacity-45"></div>
-                  <div className="absolute top-[45%] left-[5%] w-22 h-20 bg-green-800 dark:bg-green-950 rounded-full transform -rotate-12 opacity-55"></div>
-                  <div className="absolute bottom-[30%] left-[25%] w-16 h-12 bg-green-700 dark:bg-green-900 rounded-full transform rotate-30 opacity-40"></div>
-                  <div className="absolute bottom-[15%] right-[35%] w-20 h-16 bg-green-800 dark:bg-green-950 rounded-full transform -rotate-20 opacity-45"></div>
+                <div className="absolute inset-0 opacity-50">
+                  {/* Large vegetation patches - darker greens for satellite look */}
+                  <div className="absolute top-[5%] left-[10%] w-20 h-16 bg-green-900 dark:bg-green-950 rounded-full transform rotate-12 opacity-60"></div>
+                  <div className="absolute top-[15%] left-[40%] w-24 h-18 bg-emerald-900 dark:bg-green-950 rounded-full transform -rotate-6 opacity-50"></div>
+                  <div className="absolute top-[25%] right-[20%] w-18 h-14 bg-green-800 dark:bg-green-950 rounded-full transform rotate-45 opacity-55"></div>
+                  <div className="absolute top-[45%] left-[5%] w-22 h-20 bg-teal-900 dark:bg-gray-900 rounded-full transform -rotate-12 opacity-65"></div>
+                  <div className="absolute bottom-[30%] left-[25%] w-16 h-12 bg-green-900 dark:bg-green-950 rounded-full transform rotate-30 opacity-50"></div>
+                  <div className="absolute bottom-[15%] right-[35%] w-20 h-16 bg-emerald-900 dark:bg-gray-900 rounded-full transform -rotate-20 opacity-55"></div>
 
-                  {/* Agricultural fields */}
-                  <div className="absolute top-[8%] left-[65%] w-14 h-10 bg-amber-200 dark:bg-amber-600 opacity-50 transform rotate-15"></div>
-                  <div className="absolute top-[35%] right-[15%] w-12 h-8 bg-amber-300 dark:bg-amber-700 opacity-45 transform -rotate-10"></div>
-                  <div className="absolute bottom-[40%] left-[70%] w-16 h-12 bg-yellow-200 dark:bg-yellow-600 opacity-50 transform rotate-25"></div>
+                  {/* Agricultural fields - brown/tan for realistic satellite view */}
+                  <div className="absolute top-[8%] left-[65%] w-14 h-10 bg-amber-700 dark:bg-amber-900 opacity-60 transform rotate-15"></div>
+                  <div className="absolute top-[35%] right-[15%] w-12 h-8 bg-yellow-700 dark:bg-yellow-900 opacity-55 transform -rotate-10"></div>
+                  <div className="absolute bottom-[40%] left-[70%] w-16 h-12 bg-orange-800 dark:bg-orange-950 opacity-60 transform rotate-25"></div>
                 </div>
 
-                {/* Water Bodies */}
+                {/* Water Bodies - darker blue for satellite realism */}
                 {/* Galveston Bay */}
-                <div className="absolute bottom-0 right-0 w-40 h-32 bg-blue-500 dark:bg-blue-700 opacity-85">
-                  <div className="absolute inset-2 bg-blue-400 dark:bg-blue-600 opacity-60"></div>
-                  <div className="absolute bottom-2 right-2 w-8 h-6 bg-blue-600 dark:bg-blue-800 opacity-70"></div>
+                <div className="absolute bottom-0 right-0 w-40 h-32 bg-blue-700 dark:bg-blue-900 opacity-90">
+                  <div className="absolute inset-2 bg-blue-600 dark:bg-blue-800 opacity-70"></div>
+                  <div className="absolute bottom-2 right-2 w-8 h-6 bg-blue-800 dark:bg-blue-950 opacity-80"></div>
                 </div>
-                <div className="absolute bottom-0 right-24 w-24 h-20 bg-blue-500 dark:bg-blue-700 opacity-80">
-                  <div className="absolute inset-1 bg-blue-400 dark:bg-blue-600 opacity-50"></div>
+                <div className="absolute bottom-0 right-24 w-24 h-20 bg-blue-700 dark:bg-blue-900 opacity-85">
+                  <div className="absolute inset-1 bg-blue-600 dark:bg-blue-800 opacity-60"></div>
                 </div>
 
                 {/* Buffalo Bayou */}
-                <div className="absolute top-1/2 left-0 right-0 h-3 bg-blue-600 dark:bg-blue-800 transform -rotate-2 opacity-80">
-                  <div className="absolute inset-0 bg-blue-500 dark:bg-blue-700 opacity-60"></div>
+                <div className="absolute top-1/2 left-0 right-0 h-3 bg-blue-800 dark:bg-blue-950 transform -rotate-2 opacity-85">
+                  <div className="absolute inset-0 bg-blue-700 dark:bg-blue-900 opacity-70"></div>
                 </div>
 
                 {/* Ship Channel */}
-                <div className="absolute bottom-8 left-1/2 right-0 h-4 bg-blue-600 dark:bg-blue-800 transform rotate-6 origin-left opacity-80">
-                  <div className="absolute inset-0 bg-blue-500 dark:bg-blue-700 opacity-60"></div>
+                <div className="absolute bottom-8 left-1/2 right-0 h-4 bg-blue-800 dark:bg-blue-950 transform rotate-6 origin-left opacity-85">
+                  <div className="absolute inset-0 bg-blue-700 dark:bg-blue-900 opacity-70"></div>
                 </div>
 
                 {/* Major Highways - Realistic */}
@@ -705,19 +777,20 @@ export default function HomeContent() {
                   </div>
                 </div>
 
-                {/* Suburban Areas */}
-                <div className="absolute top-1/4 left-1/5 w-14 h-10 bg-yellow-100 dark:bg-yellow-700 opacity-70 shadow-inner"></div>
-                <div className="absolute top-1/6 right-1/5 w-12 h-8 bg-amber-100 dark:bg-amber-700 opacity-70 shadow-inner"></div>
-                <div className="absolute bottom-1/3 left-1/4 w-16 h-12 bg-yellow-50 dark:bg-yellow-800 opacity-70 shadow-inner"></div>
+                {/* Suburban Areas - earth tones for satellite realism */}
+                <div className="absolute top-1/4 left-1/5 w-14 h-10 bg-stone-700 dark:bg-stone-900 opacity-75 shadow-inner"></div>
+                <div className="absolute top-1/6 right-1/5 w-12 h-8 bg-stone-600 dark:bg-stone-800 opacity-75 shadow-inner"></div>
+                <div className="absolute bottom-1/3 left-1/4 w-16 h-12 bg-amber-800 dark:bg-amber-950 opacity-75 shadow-inner"></div>
 
-                {/* Forest Areas */}
-                <div className="absolute top-[20%] left-[30%] w-18 h-14 bg-green-700 dark:bg-green-900 opacity-70 rounded-lg shadow-inner"></div>
-                <div className="absolute bottom-[35%] right-[25%] w-14 h-18 bg-green-700 dark:bg-green-900 opacity-70 rounded-lg shadow-inner"></div>
-                <div className="absolute top-[60%] left-[15%] w-12 h-10 bg-green-700 dark:bg-green-900 opacity-70 rounded-lg shadow-inner"></div>
+                {/* Forest Areas - darker greens for satellite view */}
+                <div className="absolute top-[20%] left-[30%] w-18 h-14 bg-green-900 dark:bg-green-950 opacity-80 rounded-lg shadow-inner"></div>
+                <div className="absolute bottom-[35%] right-[25%] w-14 h-18 bg-emerald-900 dark:bg-green-950 opacity-80 rounded-lg shadow-inner"></div>
+                <div className="absolute top-[60%] left-[15%] w-12 h-10 bg-teal-900 dark:bg-gray-900 opacity-80 rounded-lg shadow-inner"></div>
 
                 {/* Coastal vegetation */}
-                <div className="absolute bottom-[5%] right-[45%] w-8 h-6 bg-green-600 dark:bg-green-800 opacity-60 rounded-full"></div>
-                <div className="absolute bottom-[15%] right-[55%] w-10 h-8 bg-green-600 dark:bg-green-800 opacity-60 rounded-full"></div>
+                <div className="absolute bottom-[5%] right-[45%] w-8 h-6 bg-green-800 dark:bg-green-950 opacity-70 rounded-full"></div>
+                <div className="absolute bottom-[15%] right-[55%] w-10 h-8 bg-emerald-800 dark:bg-green-950 opacity-70 rounded-full"></div>
+              </div>
               </div>
 
             {/* Well Markers */}
@@ -729,8 +802,8 @@ export default function HomeContent() {
                   color = 'bg-green-500';
                   bgColor = 'bg-green-100 dark:bg-green-900/20';
                 } else if (well.status === 'Warning') {
-                  color = 'bg-orange-500';
-                  bgColor = 'bg-orange-100 dark:bg-orange-900/20';
+                  color = 'bg-yellow-500';
+                  bgColor = 'bg-yellow-100 dark:bg-yellow-900/20';
                 } else {
                   color = 'bg-red-500';
                   bgColor = 'bg-red-100 dark:bg-red-900/20';
@@ -739,13 +812,13 @@ export default function HomeContent() {
                 return (
                   <div
                     key={well.id}
-                    className="absolute group cursor-pointer transform -translate-x-1/2 -translate-y-1/2"
+                    className="absolute group cursor-pointer transform -translate-x-1/2 -translate-y-1/2 hover:z-[100]"
                     style={{ left: `${well.x}%`, top: `${well.y}%` }}
                   >
                     <div className={`w-4 h-4 ${color} rounded-full shadow-lg hover:scale-125 transition-transform duration-200 border-2 border-white dark:border-gray-800`}></div>
 
                     {/* Enhanced Tooltip */}
-                    <div className={`absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 ${
+                    <div className={`absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 ${
                       well.x > 70 ? 'right-0' : well.x < 30 ? 'left-0' : 'left-1/2 transform -translate-x-1/2'
                     }`}>
                       <div className="bg-white dark:bg-gray-800 rounded-lg px-4 py-3 shadow-xl border border-gray-200 dark:border-gray-600 min-w-[240px]">
@@ -792,7 +865,7 @@ export default function HomeContent() {
                         <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-600">
                           <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                             well.status === 'Operational' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
-                            well.status === 'Warning' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400' :
+                            well.status === 'Warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
                             'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
                           }`}>
                             <div className={`w-2 h-2 rounded-full mr-1 ${color.replace('bg-', 'bg-')}`}></div>
@@ -849,22 +922,22 @@ export default function HomeContent() {
                     Impact
                   </th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
-                    Operator
+                    Area
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {[
-                  { wellId: 'SW-Terminal-016', lostProd: '84.2 BBL', hours: '84h', impact: 'High' },
-                  { wellId: 'Refinery-Junction-005', lostProd: '67.5 BBL', hours: '67h', impact: 'High' },
-                  { wellId: 'Galveston-Bay-018', lostProd: '45.8 BBL', hours: '16h', impact: 'Medium' },
-                  { wellId: 'Gulf-Coast-Unit-003', lostProd: '38.9 BBL', hours: '14h', impact: 'Medium' },
-                  { wellId: 'Katy-Freeway-Unit-008', lostProd: '32.1 BBL', hours: '18h', impact: 'Medium' },
-                  { wellId: 'Tomball-Junction-012', lostProd: '28.7 BBL', hours: '12h', impact: 'Medium' },
-                  { wellId: 'Cypress-Station-022', lostProd: '24.3 BBL', hours: '9h', impact: 'Low' },
-                  { wellId: 'Downtown-Central-024', lostProd: '18.5 BBL', hours: '7h', impact: 'Low' },
-                  { wellId: 'Energy-Plaza-006', lostProd: '15.2 BBL', hours: '5h', impact: 'Low' },
-                  { wellId: 'Memorial-Station-009', lostProd: '12.8 BBL', hours: '4h', impact: 'Low' },
+                  { wellId: 'SW-Terminal-016', lostProd: '84.2 BBL', hours: '84h', impact: 'High', area: 'Southwest' },
+                  { wellId: 'Refinery-Junction-005', lostProd: '67.5 BBL', hours: '67h', impact: 'High', area: 'Ship Channel' },
+                  { wellId: 'Galveston-Bay-018', lostProd: '45.8 BBL', hours: '16h', impact: 'Medium', area: 'Southeast Coastal' },
+                  { wellId: 'Gulf-Coast-Unit-003', lostProd: '38.9 BBL', hours: '14h', impact: 'Medium', area: 'Ship Channel' },
+                  { wellId: 'Katy-Freeway-Unit-008', lostProd: '32.1 BBL', hours: '18h', impact: 'Medium', area: 'West Houston' },
+                  { wellId: 'Tomball-Junction-012', lostProd: '28.7 BBL', hours: '12h', impact: 'Medium', area: 'North Houston' },
+                  { wellId: 'Cypress-Station-022', lostProd: '24.3 BBL', hours: '9h', impact: 'Low', area: 'Northwest' },
+                  { wellId: 'Downtown-Central-024', lostProd: '18.5 BBL', hours: '7h', impact: 'Low', area: 'Central' },
+                  { wellId: 'Energy-Plaza-006', lostProd: '15.2 BBL', hours: '5h', impact: 'Low', area: 'Energy Corridor' },
+                  { wellId: 'Memorial-Station-009', lostProd: '12.8 BBL', hours: '4h', impact: 'Low', area: 'West Houston' },
                 ].map((well, index) => (
                   <tr
                     key={index}
@@ -882,14 +955,14 @@ export default function HomeContent() {
                     <td className="py-4 px-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                         well.impact === 'High' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
-                        well.impact === 'Medium' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400' :
+                        well.impact === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
                         'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                       }`}>
                         {well.impact}
                       </span>
                     </td>
                     <td className="py-4 px-4 text-gray-600 dark:text-gray-400">
-                      Baytex
+                      {well.area}
                     </td>
                   </tr>
                 ))}
@@ -916,6 +989,23 @@ export default function HomeContent() {
           </div>
         </div>
       </footer>
+
+      <style jsx global>{`
+        /* Dark mode color adjustments */
+        :global(.dark) [style*="backgroundColor: #2F80ED"] {
+          background-color: #4C9AFF !important;
+        }
+        :global(.dark) [style*="color: #2F80ED"] {
+          color: #4C9AFF !important;
+        }
+
+        /* Hover effect */
+        [style*="backgroundColor: #2F80ED"]:hover,
+        [style*="backgroundColor: #9CC2F9"]:hover,
+        [style*="backgroundColor: #C6DEFF"]:hover {
+          filter: brightness(1.15);
+        }
+      `}</style>
     </div>
   );
 }

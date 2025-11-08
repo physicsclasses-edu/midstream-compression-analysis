@@ -2,10 +2,13 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea, ReferenceLine } from 'recharts';
 import { useState, useEffect, useRef } from 'react';
-import { Maximize2, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Maximize2, Minimize2, ChevronLeft, ChevronRight, ChevronDown, Settings, RotateCcw } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 interface TimeSeriesChartProps {
   well: string;
+  wells?: string[];
+  onWellChange?: (well: string) => void;
   metrics: string[];
   dateRange: { from: string; to: string };
 }
@@ -21,18 +24,104 @@ const PHASES = {
 // Define which metrics use left vs right Y-axis
 const RIGHT_AXIS_METRICS = ['Gas Injection Pressure', 'Gas Injection Rate', 'Casing Pressure', 'Tubing Pressure'];
 
-// Color palette for different metrics
-const METRIC_COLORS: { [key: string]: string } = {
-  'Line Pressure': '#3b82f6', // blue
-  'Gas Injection Pressure': '#10b981', // green
-  'Gas Injection Rate': '#f59e0b', // amber
-  'Choke': '#8b5cf6', // purple
-  'Casing Pressure': '#ec4899', // pink
-  'Tubing Pressure': '#06b6d4', // cyan
-  'Oil Production Rate': '#ef4444', // red
-  'Water Production Rate': '#f97316', // orange
-  'Gas Production Rate': '#84cc16', // lime
-  'Predicted Oil Production Rate': '#dc2626', // dark red (close to actual)
+// Base color palette for different metrics
+const BASE_METRIC_COLORS: string[] = [
+  "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
+  "#EDC949", "#AF7AA1", "#FF9DA7", "#9C755F", "#BAB0AC"
+];
+
+// Mapping of metrics to colors
+const METRIC_COLOR_MAP: { [key: string]: number } = {
+  'Line Pressure': 0,
+  'Gas Injection Pressure': 1,
+  'Gas Injection Rate': 2,
+  'Choke': 3,
+  'Casing Pressure': 4,
+  'Tubing Pressure': 5,
+  'Oil Production Rate': 6,
+  'Water Production Rate': 7,
+  'Gas Production Rate': 8,
+  'Predicted Oil Production Rate': 9,
+};
+
+// Utility function to adjust color brightness
+const adjustColorBrightness = (color: string, isDark: boolean): string => {
+  const hex = color.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  const factor = isDark ? 1.10 : 1.0; // Lighten by 10% in dark mode
+
+  const adjustChannel = (channel: number) => {
+    const adjusted = Math.round(channel * factor);
+    return Math.min(255, Math.max(0, adjusted));
+  };
+
+  const newR = adjustChannel(r);
+  const newG = adjustChannel(g);
+  const newB = adjustChannel(b);
+
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
+// Utility function to increase saturation
+const increaseSaturation = (color: string, percent: number): string => {
+  const hex = color.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+
+  if (delta === 0) return color; // Gray color, no saturation to increase
+
+  const lightness = (max + min) / 2;
+  const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+
+  // Increase saturation
+  const newSaturation = Math.min(1, saturation * (1 + percent / 100));
+
+  // Convert back to RGB
+  let hue = 0;
+  if (max === r) {
+    hue = ((g - b) / delta + (g < b ? 6 : 0)) / 6;
+  } else if (max === g) {
+    hue = ((b - r) / delta + 2) / 6;
+  } else {
+    hue = ((r - g) / delta + 4) / 6;
+  }
+
+  const hslToRgb = (h: number, s: number, l: number) => {
+    let rNew, gNew, bNew;
+    if (s === 0) {
+      rNew = gNew = bNew = l;
+    } else {
+      const hue2rgb = (p: number, q: number, t: number) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+      };
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      rNew = hue2rgb(p, q, h + 1/3);
+      gNew = hue2rgb(p, q, h);
+      bNew = hue2rgb(p, q, h - 1/3);
+    }
+    return {
+      r: Math.round(rNew * 255),
+      g: Math.round(gNew * 255),
+      b: Math.round(bNew * 255)
+    };
+  };
+
+  const rgb = hslToRgb(hue, newSaturation, lightness);
+  return `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
 };
 
 // Deterministic random function for SSR compatibility
@@ -42,10 +131,15 @@ const seededRandom = (seed: number) => {
 };
 
 // Generate realistic time-series data with hourly granularity
-const generateTimeSeriesData = (metrics: string[], well: string) => {
+const generateTimeSeriesData = (metrics: string[], well: string, dateRange: { from: string; to: string }) => {
   const data = [];
-  const totalDays = 21; // 21 days
-  const startDate = new Date(2024, 0, 1); // January 1, 2024
+
+  // Use actual date range from calendar
+  const startDate = dateRange.from ? new Date(dateRange.from) : new Date(2024, 0, 1);
+  const endDate = dateRange.to ? new Date(dateRange.to) : new Date(2024, 0, 22);
+
+  // Calculate total days from date range
+  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
   // Base values for different metrics
   const metricBases: { [key: string]: { base: number, unit: string, variance: number } } = {
@@ -161,26 +255,98 @@ const generateTimeSeriesData = (metrics: string[], well: string) => {
   return data;
 };
 
-export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeriesChartProps) {
+export default function TimeSeriesChart({ well, wells, onWellChange, metrics, dateRange }: TimeSeriesChartProps) {
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+
+  // Well dropdown state
+  const [isWellDropdownOpen, setIsWellDropdownOpen] = useState(false);
+  const wellDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Calculate total days from date range
+  const calculateTotalDays = () => {
+    if (!dateRange.from || !dateRange.to) return 21;
+    const start = new Date(dateRange.from);
+    const end = new Date(dateRange.to);
+    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const totalDays = calculateTotalDays();
   const [rangeStart, setRangeStart] = useState(0);
-  const [rangeEnd, setRangeEnd] = useState(21);
+  const [rangeEnd, setRangeEnd] = useState(totalDays);
 
   // Legend toggle state - track which metrics are visible
+  // Only Line Pressure and Gas Injection Pressure are visible by default
   const [visibleMetrics, setVisibleMetrics] = useState<{[key: string]: boolean}>(() =>
-    metrics.reduce((acc, metric) => ({ ...acc, [metric]: true }), {})
+    metrics.reduce((acc, metric) => ({
+      ...acc,
+      [metric]: metric === 'Line Pressure' || metric === 'Gas Injection Pressure'
+    }), {})
   );
 
   // Hover state - track which metric is being hovered
   const [hoveredMetric, setHoveredMetric] = useState<string | null>(null);
 
+  // Mouse zoom/pan state
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<number | null>(null);
+  const chartAreaRef = useRef<HTMLDivElement>(null);
+
+  // Chart style customization state
+  const defaultChartStyles = {
+    axisTitleSize: 11,
+    tickTextSize: 11,
+    axisLineWidth: 1,
+    gridOpacity: 0.2,
+    chartLineWidth: 2,
+    legendSize: 14,
+    legendPosition: 'center' as 'left' | 'center' | 'right',
+  };
+
+  const [chartStyles, setChartStyles] = useState(defaultChartStyles);
+  const [isStylePanelOpen, setIsStylePanelOpen] = useState(false);
+  const stylePanelRef = useRef<HTMLDivElement>(null);
+
+  // Reset chart styles to default
+  const resetChartStyles = () => {
+    setChartStyles(defaultChartStyles);
+  };
+
   // Generate data immediately on render (deterministic, so SSR-safe)
-  const data = generateTimeSeriesData(metrics, well);
+  const data = generateTimeSeriesData(metrics, well, dateRange);
+
+  // Handle SSR
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Get adjusted color based on theme
+  const getMetricColor = (metric: string, isHovered: boolean = false): string => {
+    const colorIndex = METRIC_COLOR_MAP[metric] ?? 0;
+    const baseColor = BASE_METRIC_COLORS[colorIndex];
+
+    if (!mounted) return baseColor; // Return base color during SSR
+
+    const isDark = resolvedTheme === 'dark' || theme === 'dark';
+    let adjustedColor = adjustColorBrightness(baseColor, isDark);
+
+    // Increase saturation on hover
+    if (isHovered) {
+      adjustedColor = increaseSaturation(adjustedColor, 10);
+    }
+
+    return adjustedColor;
+  };
 
   // Update visible metrics when metrics prop changes
+  // Only Line Pressure and Gas Injection Pressure are visible by default
   useEffect(() => {
-    setVisibleMetrics(metrics.reduce((acc, metric) => ({ ...acc, [metric]: true }), {}));
+    setVisibleMetrics(metrics.reduce((acc, metric) => ({
+      ...acc,
+      [metric]: metric === 'Line Pressure' || metric === 'Gas Injection Pressure'
+    }), {}));
   }, [metrics.join(',')]);
 
   // Toggle metric visibility
@@ -190,6 +356,12 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
 
   // Update range when dateRange changes
   useEffect(() => {
+    // Initialize range to full date range when totalDays changes
+    setRangeStart(0);
+    setRangeEnd(totalDays);
+  }, [totalDays]);
+
+  useEffect(() => {
     if (dateRange.from && dateRange.to && data.length > 0) {
       const fromDate = new Date(dateRange.from);
       const toDate = new Date(dateRange.to);
@@ -197,14 +369,26 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
 
       // Calculate day indices based on date range
       const startIndex = Math.max(0, Math.floor((fromDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
-      const endIndex = Math.min(data.length - 1, Math.floor((toDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
+      const endIndex = Math.min(totalDays, Math.ceil((toDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
 
-      if (startIndex < data.length && endIndex >= 0) {
-        setRangeStart(Math.max(0, startIndex));
-        setRangeEnd(Math.min(data.length - 1, endIndex));
+      if (startIndex <= endIndex && startIndex >= 0 && endIndex <= totalDays) {
+        setRangeStart(startIndex);
+        setRangeEnd(endIndex);
       }
     }
-  }, [dateRange, data.length]);
+  }, [dateRange, data.length, totalDays]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wellDropdownRef.current && !wellDropdownRef.current.contains(event.target as Node)) {
+        setIsWellDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Get visible data based on range (convert day indices to hour indices)
   const startHourIndex = rangeStart * 24;
@@ -228,6 +412,99 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
     document.addEventListener('fullscreenchange', handleFullScreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullScreenChange);
   }, []);
+
+  // Mouse wheel zoom handler - only activates with Shift key
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    // Only zoom if Shift key is pressed
+    if (!e.shiftKey) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const zoomFactor = 0.1;
+    const currentRange = rangeEnd - rangeStart;
+    const zoomAmount = Math.max(1, Math.round(currentRange * zoomFactor));
+
+    if (e.deltaY < 0) {
+      // Zoom in
+      if (currentRange > 2) {
+        const newStart = rangeStart + zoomAmount;
+        const newEnd = rangeEnd - zoomAmount;
+        if (newEnd > newStart) {
+          setRangeStart(newStart);
+          setRangeEnd(newEnd);
+        }
+      }
+    } else {
+      // Zoom out
+      const newStart = Math.max(0, rangeStart - zoomAmount);
+      const newEnd = Math.min(totalDays, rangeEnd + zoomAmount);
+      setRangeStart(newStart);
+      setRangeEnd(newEnd);
+    }
+  };
+
+  // Mouse pan handlers
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button === 0) { // Left mouse button
+      setIsPanning(true);
+      setPanStart(e.clientX);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isPanning || panStart === null || !chartAreaRef.current) return;
+
+    const rect = chartAreaRef.current.getBoundingClientRect();
+    const chartWidth = rect.width;
+    const deltaX = e.clientX - panStart;
+    const currentRange = rangeEnd - rangeStart;
+
+    // Calculate pan amount based on mouse movement
+    const panAmount = Math.round((deltaX / chartWidth) * currentRange);
+
+    if (panAmount !== 0) {
+      const newStart = Math.max(0, rangeStart - panAmount);
+      const newEnd = Math.min(totalDays, rangeEnd - panAmount);
+
+      // Only pan if both bounds are valid
+      if (newEnd - newStart === currentRange) {
+        setRangeStart(newStart);
+        setRangeEnd(newEnd);
+        setPanStart(e.clientX);
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+    setPanStart(null);
+  };
+
+  // Global mouse up listener for panning
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isPanning) {
+        setIsPanning(false);
+        setPanStart(null);
+      }
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isPanning]);
+
+  // Close style panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (stylePanelRef.current && !stylePanelRef.current.contains(event.target as Node)) {
+        setIsStylePanelOpen(false);
+      }
+    };
+    if (isStylePanelOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isStylePanelOpen]);
 
   // Determine if we need dual axes
   const hasLeftAxisMetrics = metrics.some(m => !RIGHT_AXIS_METRICS.includes(m));
@@ -260,17 +537,198 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
 
   return (
     <>
-      <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none" style={{ outline: 'none' }} tabIndex={-1}>
+      <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none overflow-auto" style={{ outline: 'none' }} tabIndex={-1}>
       <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            Time-Series Analysis: {well}
-          </h3>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              Time-Series Analysis:
+            </h3>
+            {wells && wells.length > 0 && onWellChange && (
+              <div className="relative" ref={wellDropdownRef}>
+                <button
+                  onClick={() => setIsWellDropdownOpen(!isWellDropdownOpen)}
+                  className="px-4 py-2 text-base font-semibold bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+                >
+                  {well}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${isWellDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isWellDropdownOpen && (
+                  <div className="absolute z-30 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-60 overflow-auto min-w-[200px]">
+                    {wells.map((wellOption, index) => (
+                      <button
+                        key={wellOption}
+                        onClick={() => {
+                          onWellChange(wellOption);
+                          setIsWellDropdownOpen(false);
+                        }}
+                        className={`w-full px-4 py-2.5 text-left transition-colors ${
+                          index === 0 ? 'rounded-t-lg' : ''
+                        } ${
+                          index === wells.length - 1 ? 'rounded-b-lg' : ''
+                        } ${
+                          well === wellOption
+                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {wellOption}
+                        {well === wellOption && (
+                          <span className="ml-2 text-blue-500 dark:text-blue-400">✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {metrics.length} metric{metrics.length > 1 ? 's' : ''} over 21 days with phase transitions
+            Showing {Object.values(visibleMetrics).filter(v => v).length} metric{Object.values(visibleMetrics).filter(v => v).length > 1 ? 's' : ''} over {totalDays} days with phase transitions • <span className="italic">(Shift+Scroll to zoom • Drag to pan)</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Chart Settings Button */}
+          <div className="relative" ref={stylePanelRef}>
+            <button
+              onClick={() => setIsStylePanelOpen(!isStylePanelOpen)}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-1"
+              title="Chart Style Settings"
+            >
+              <Settings className="w-4 h-4" />
+              Chart Style
+            </button>
+
+            {/* Settings Panel Dropdown */}
+            {isStylePanelOpen && (
+              <div className="absolute right-0 top-full mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-4 min-w-[320px] z-50">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">Chart Style Settings</h4>
+                    <button
+                      onClick={resetChartStyles}
+                      className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-1"
+                      title="Reset to Default"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Reset
+                    </button>
+                  </div>
+
+                  {/* Axis Title Size */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Axis Title Size: {chartStyles.axisTitleSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min="8"
+                      max="20"
+                      value={chartStyles.axisTitleSize}
+                      onChange={(e) => setChartStyles({ ...chartStyles, axisTitleSize: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Tick Text Size */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Tick Text Size: {chartStyles.tickTextSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min="8"
+                      max="16"
+                      value={chartStyles.tickTextSize}
+                      onChange={(e) => setChartStyles({ ...chartStyles, tickTextSize: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Axis Line Width */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Axis Line Width: {chartStyles.axisLineWidth}px
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="4"
+                      step="0.5"
+                      value={chartStyles.axisLineWidth}
+                      onChange={(e) => setChartStyles({ ...chartStyles, axisLineWidth: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Grid Opacity */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Grid Opacity: {Math.round(chartStyles.gridOpacity * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={chartStyles.gridOpacity}
+                      onChange={(e) => setChartStyles({ ...chartStyles, gridOpacity: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Chart Line Width */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Chart Line Width: {chartStyles.chartLineWidth}px
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="0.5"
+                      value={chartStyles.chartLineWidth}
+                      onChange={(e) => setChartStyles({ ...chartStyles, chartLineWidth: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Legend Font Size */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Legend Font Size: {chartStyles.legendSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="18"
+                      value={chartStyles.legendSize}
+                      onChange={(e) => setChartStyles({ ...chartStyles, legendSize: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Legend Position */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Legend Position
+                    </label>
+                    <select
+                      value={chartStyles.legendPosition}
+                      onChange={(e) => setChartStyles({ ...chartStyles, legendPosition: e.target.value as 'left' | 'center' | 'right' })}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={toggleFullScreen}
             className="px-3 py-1.5 text-sm font-medium rounded-lg border bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-1"
@@ -291,13 +749,36 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
       </div>
 
       {/* Chart */}
-      <div className="w-full outline-none" style={{ height: '500px' }}>
+      <div
+        ref={chartAreaRef}
+        className="w-full outline-none"
+        style={{
+          height: '500px',
+          cursor: isPanning ? 'grabbing' : 'grab',
+          userSelect: 'none'
+        }}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleData}
-            margin={{ top: 20, right: 50, left: 20, bottom: 0 }}
+            margin={{ top: 20, right: 20, left: 20, bottom: 0 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
+            <defs>
+              <filter id="whiteGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+                <feFlood floodColor="#FFFFFF" floodOpacity="0.5" result="glowColor" />
+                <feComposite in="glowColor" in2="blur" operator="in" result="softGlow" />
+                <feMerge>
+                  <feMergeNode in="softGlow" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={chartStyles.gridOpacity} />
 
             {/* Background phases - Using index for x-axis matching */}
             {visibleData.length > 0 && (
@@ -335,11 +816,11 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                   />
                 )}
 
-                {/* Continuous Phase: Days 9-21 - Blue background */}
-                {rangeEnd >= 9 && rangeStart <= 21 && (
+                {/* Continuous Phase: Days 9-totalDays - Blue background */}
+                {rangeEnd >= 9 && rangeStart <= totalDays && (
                   <ReferenceArea
                     x1={visibleData[Math.max(0, (9 - rangeStart) * 24)]?.index}
-                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(21, rangeEnd) - rangeStart) * 24 + 23)]?.index}
+                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(totalDays, rangeEnd) - rangeStart) * 24 + 23)]?.index}
                     stroke="none"
                     fill="#3b82f6"
                     fillOpacity={0.15}
@@ -388,11 +869,12 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
             <XAxis
               dataKey="index"
               stroke="#6b7280"
-              tick={{ fill: '#6b7280', fontSize: 9 }}
+              strokeWidth={chartStyles.axisLineWidth}
+              tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
               angle={-45}
               textAnchor="end"
               height={80}
-              ticks={visibleData.filter(d => d.hour === 0).map(d => d.index)}
+              ticks={visibleData.filter(d => d.hour === 0 && d.day % 3 === 0).map(d => d.index)}
               tickFormatter={(value) => {
                 const dataPoint = visibleData.find(d => d.index === value);
                 return dataPoint?.date || '';
@@ -404,15 +886,11 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
               <YAxis
                 yAxisId="left"
                 stroke="#3b82f6"
-                tick={{ fill: '#6b7280', fontSize: 11 }}
-                label={{
-                  value: 'Left Axis (Pressure, Production, etc.)',
-                  angle: -90,
-                  position: 'insideLeft',
-                  style: { fill: '#3b82f6', fontSize: 11, textAnchor: 'middle' }
-                }}
+                strokeWidth={chartStyles.axisLineWidth}
+                tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
                 domain={[0, 'auto']}
+                label={{ value: '(Pressure, Production, etc.)', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
               />
             )}
 
@@ -422,15 +900,11 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                 yAxisId="right"
                 orientation="right"
                 stroke="#10b981"
-                tick={{ fill: '#6b7280', fontSize: 11 }}
-                label={{
-                  value: 'Right Axis (Gas Injection, Casing, etc.)',
-                  angle: 90,
-                  position: 'insideRight',
-                  style: { fill: '#10b981', fontSize: 11, textAnchor: 'middle' }
-                }}
+                strokeWidth={chartStyles.axisLineWidth}
+                tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
                 domain={[0, 'auto']}
+                label={{ value: '(Gas Injection, Casing, etc.)', angle: 90, position: 'insideRight', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
               />
             )}
 
@@ -439,19 +913,25 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
             {/* Render lines for each visible metric */}
             {metrics.filter(metric => visibleMetrics[metric]).map((metric) => {
               const isRightAxis = RIGHT_AXIS_METRICS.includes(metric);
-              const opacity = hoveredMetric === null ? 1 : hoveredMetric === metric ? 1 : 0.2;
+              const isHovered = hoveredMetric === metric;
+              const baseOpacity = 0.85;
+              const opacity = hoveredMetric === null ? baseOpacity : isHovered ? 1 : 0.2;
+              const strokeWidth = isHovered ? chartStyles.chartLineWidth + 1 : chartStyles.chartLineWidth;
+              const strokeColor = getMetricColor(metric, isHovered);
+
               return (
                 <Line
                   key={metric}
                   type="monotone"
                   dataKey={metric}
-                  stroke={METRIC_COLORS[metric] || '#6b7280'}
-                  strokeWidth={2}
+                  stroke={strokeColor}
+                  strokeWidth={strokeWidth}
                   strokeOpacity={opacity}
                   dot={false}
-                  activeDot={{ r: 4 }}
+                  activeDot={{ r: 4, stroke: '#FFFFFF', strokeWidth: 2, fill: strokeColor }}
                   name={metric}
                   yAxisId={isRightAxis ? 'right' : 'left'}
+                  filter={isHovered ? 'url(#whiteGlow)' : undefined}
                 />
               );
             })}
@@ -460,71 +940,86 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
       </div>
 
       {/* Time Range Slider */}
-      <div className="px-16 flex justify-center items-center -mt-8">
-        <div className="relative pt-1 pb-1 w-full max-w-2xl mt-3">
-          {/* Track background */}
-          <div className="absolute top-2 left-0 right-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+      <div className="mt-6" style={{ marginLeft: '85px', marginRight: '85px' }}>
+        <div className="relative" style={{ paddingTop: '0px', paddingBottom: '20px' }}>
+          {/* Range track background */}
+          <div className="absolute top-0 w-full h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
 
-          {/* Selected range highlight */}
+          {/* Active range highlight */}
           <div
-            className="absolute top-2 h-2 bg-blue-500 dark:bg-blue-600 rounded-lg pointer-events-none z-10"
+            className="absolute top-0 h-1 bg-blue-500 dark:bg-blue-400 rounded-full pointer-events-none"
             style={{
-              left: `${(rangeStart / 21) * 100}%`,
-              right: `${100 - (rangeEnd / 21) * 100}%`
+              left: `${(rangeStart / totalDays) * 100}%`,
+              width: `${((rangeEnd - rangeStart) / totalDays) * 100}%`,
             }}
-          ></div>
+          />
 
-          {/* Start slider */}
+          {/* Start range input */}
           <input
             type="range"
             min="0"
-            max={21}
+            max={totalDays}
             value={rangeStart}
             onChange={(e) => {
-              const value = Number(e.target.value);
-              if (value < rangeEnd) {
-                setRangeStart(value);
+              const newStart = parseInt(e.target.value);
+              if (newStart < rangeEnd) {
+                setRangeStart(newStart);
               }
             }}
-            className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-30 range-slider-start"
-            style={{
-              top: '0.5rem',
-              pointerEvents: 'auto'
-            }}
+            className="range-slider range-slider-start absolute w-full"
+            style={{ zIndex: rangeStart > rangeEnd - 2 ? 5 : 3, top: 0 }}
           />
 
-          {/* End slider */}
+          {/* End range input */}
           <input
             type="range"
             min="0"
-            max={21}
+            max={totalDays}
             value={rangeEnd}
             onChange={(e) => {
-              const value = Number(e.target.value);
-              if (value > rangeStart) {
-                setRangeEnd(value);
+              const newEnd = parseInt(e.target.value);
+              if (newEnd > rangeStart) {
+                setRangeEnd(newEnd);
               }
             }}
-            className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-40 range-slider-end"
-            style={{
-              top: '0.5rem',
-              pointerEvents: 'auto'
-            }}
+            className="range-slider range-slider-end absolute w-full"
+            style={{ zIndex: 4, top: 0 }}
           />
 
-          {/* Labels below slider */}
-          <div className="flex justify-between mt-4 text-xs text-gray-600 dark:text-gray-400">
-            <span>{data[startHourIndex]?.date}</span>
-            <span>{data[Math.min(endHourIndex - 1, data.length - 1)]?.date}</span>
-          </div>
+          {/* Date labels below slider ends */}
+          <span
+            className="absolute text-xs font-medium text-gray-700 dark:text-gray-300"
+            style={{
+              left: `${(rangeStart / totalDays) * 100}%`,
+              top: '24px',
+              transform: 'translateX(-50%)'
+            }}
+          >
+            {data[rangeStart * 24]?.date || ''}
+          </span>
+          <span
+            className="absolute text-xs font-medium text-gray-700 dark:text-gray-300"
+            style={{
+              left: `${(rangeEnd / totalDays) * 100}%`,
+              top: '24px',
+              transform: 'translateX(-50%)'
+            }}
+          >
+            {data[rangeEnd * 24]?.date || ''}
+          </span>
         </div>
       </div>
 
       {/* Custom Interactive Legend */}
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+      <div className={`mt-6 flex flex-wrap items-center gap-x-6 gap-y-6 ${
+        chartStyles.legendPosition === 'left' ? 'justify-start' :
+        chartStyles.legendPosition === 'right' ? 'justify-end' :
+        'justify-center'
+      }`}>
         {metrics.map((metric) => {
           const isVisible = visibleMetrics[metric];
-          const color = METRIC_COLORS[metric] || '#6b7280';
+          const isHovered = hoveredMetric === metric;
+          const color = getMetricColor(metric, isHovered);
           const isRightAxis = RIGHT_AXIS_METRICS.includes(metric);
 
           return (
@@ -533,7 +1028,10 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
               onClick={() => toggleMetric(metric)}
               onMouseEnter={() => setHoveredMetric(metric)}
               onMouseLeave={() => setHoveredMetric(null)}
-              className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"
+              className="flex items-center gap-2 cursor-pointer transition-all"
+              style={{
+                filter: isHovered && isVisible ? 'drop-shadow(0 0 3px rgba(255,255,255,0.8))' : 'none'
+              }}
             >
               <svg width="18" height="10" className="flex-shrink-0">
                 {/* Left line */}
@@ -543,8 +1041,8 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                   x2="5"
                   y2="5"
                   stroke={color}
-                  strokeWidth="2"
-                  opacity={isVisible ? 1 : 0.3}
+                  strokeWidth={isHovered && isVisible ? "2.5" : "2"}
+                  opacity={isVisible ? 0.85 : 0.3}
                 />
                 {/* Center hollow circle */}
                 <circle
@@ -553,8 +1051,8 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                   r="3"
                   fill="none"
                   stroke={color}
-                  strokeWidth="2"
-                  opacity={isVisible ? 1 : 0.3}
+                  strokeWidth={isHovered && isVisible ? "2.5" : "2"}
+                  opacity={isVisible ? 0.85 : 0.3}
                 />
                 {/* Right line */}
                 <line
@@ -563,16 +1061,16 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
                   x2="18"
                   y2="5"
                   stroke={color}
-                  strokeWidth="2"
-                  opacity={isVisible ? 1 : 0.3}
+                  strokeWidth={isHovered && isVisible ? "2.5" : "2"}
+                  opacity={isVisible ? 0.85 : 0.3}
                 />
               </svg>
               <span
-                className="text-sm"
                 style={{
                   color: isVisible ? color : color,
                   opacity: isVisible ? 1 : 0.4,
-                  textDecoration: isVisible ? 'none' : 'line-through'
+                  textDecoration: isVisible ? 'none' : 'line-through',
+                  fontSize: `${chartStyles.legendSize}px`
                 }}
               >
                 {metric}<sup>{isRightAxis ? 'R' : 'L'}</sup>
@@ -617,69 +1115,77 @@ export default function TimeSeriesChart({ well, metrics, dateRange }: TimeSeries
           box-shadow: none !important;
         }
 
-        input[type="range"] {
+        /* Range Slider Styles */
+        .range-slider {
           -webkit-appearance: none;
           appearance: none;
+          background: transparent;
+          cursor: pointer;
           pointer-events: none;
+          height: 20px;
         }
 
-        input[type="range"]::-webkit-slider-runnable-track {
-          background: transparent;
-          height: 8px;
-        }
-
-        input[type="range"]::-moz-range-track {
-          background: transparent;
-          height: 8px;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
+        .range-slider::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 20px;
-          height: 20px;
+          pointer-events: all;
+          width: 16px;
+          height: 16px;
           border-radius: 50%;
+          border: 2px solid white;
+          cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          margin-top: -9px;
           background: #3b82f6;
-          cursor: grab;
-          border: 3px solid white;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          position: relative;
-          pointer-events: auto;
-          margin-top: -6px;
         }
 
-        input[type="range"]::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
+        .range-slider::-moz-range-thumb {
+          pointer-events: all;
+          width: 16px;
+          height: 16px;
           border-radius: 50%;
+          border: 2px solid white;
+          cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
           background: #3b82f6;
-          cursor: grab;
-          border: 3px solid white;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          pointer-events: auto;
         }
 
-        input[type="range"]::-webkit-slider-thumb:hover {
-          background: #2563eb;
-          transform: scale(1.15);
-          box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        /* Same color for both start and end range */
+        .range-slider-start::-webkit-slider-thumb {
+          background: #3b82f6;
         }
 
-        input[type="range"]::-moz-range-thumb:hover {
-          background: #2563eb;
-          transform: scale(1.15);
-          box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        .range-slider-start::-moz-range-thumb {
+          background: #3b82f6;
         }
 
-        input[type="range"]::-webkit-slider-thumb:active {
-          cursor: grabbing;
-          background: #1d4ed8;
+        .range-slider-end::-webkit-slider-thumb {
+          background: #3b82f6;
         }
 
-        input[type="range"]::-moz-range-thumb:active {
-          cursor: grabbing;
-          background: #1d4ed8;
+        .range-slider-end::-moz-range-thumb {
+          background: #3b82f6;
         }
+
+        .range-slider::-webkit-slider-runnable-track {
+          height: 0;
+          background: transparent;
+        }
+
+        .range-slider::-moz-range-track {
+          height: 0;
+          background: transparent;
+        }
+
+        /* Dark mode adjustments */
+        :global(.dark) .range-slider::-webkit-slider-thumb {
+          background: #60a5fa;
+        }
+
+        :global(.dark) .range-slider::-moz-range-thumb {
+          background: #60a5fa;
+        }
+
       `}</style>
       </div>
 

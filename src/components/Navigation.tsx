@@ -71,9 +71,8 @@ export default function Navigation({ activeTab, onTabChange, onDateRangeChange }
   return (
     <div className="w-full px-6 py-4">
       <nav className="container mx-auto">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-2">
-          <div className="flex items-center justify-between">
-            <div className="flex space-x-2">
+        <div className="flex items-center justify-between">
+            <div className="flex space-x-1">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -82,11 +81,10 @@ export default function Navigation({ activeTab, onTabChange, onDateRangeChange }
                   <button
                     key={tab.id}
                     onClick={() => onTabChange(tab.id)}
-                    className={`flex items-center space-x-2 py-3 px-4 rounded-lg font-medium text-sm transition-all duration-200 hover:scale-105 ${
-                      isActive
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200'
+                    className={`flex items-center space-x-2 pt-3 pb-2 px-4 text-base border-b-[3px] transition-all duration-150 tab-button ${
+                      isActive ? 'tab-active' : 'tab-inactive'
                     }`}
+                    style={{ paddingBottom: '0.5rem' }}
                   >
                     <Icon size={18} />
                     <span>{tab.label}</span>
@@ -197,8 +195,40 @@ export default function Navigation({ activeTab, onTabChange, onDateRangeChange }
                 </div>
               </div>
           </div>
-        </div>
       </nav>
+
+      <style jsx>{`
+        .tab-active {
+          border-color: #2F80ED;
+          color: #2F80ED;
+          font-weight: 600;
+        }
+
+        .tab-inactive {
+          border-color: transparent;
+          color: #111827;
+          font-weight: 500;
+        }
+
+        .tab-inactive:hover {
+          color: #4C9AFF;
+          border-color: #4C9AFF;
+        }
+
+        :global(.dark) .tab-active {
+          border-color: #4C9AFF;
+          color: #F5F7FA;
+        }
+
+        :global(.dark) .tab-inactive {
+          color: #A0A9B8;
+        }
+
+        :global(.dark) .tab-inactive:hover {
+          color: #5BAEFF;
+          border-color: #5BAEFF;
+        }
+      `}</style>
     </div>
   );
 }

@@ -19,13 +19,13 @@ export default function Home() {
   const renderContent = () => {
     switch (activeTab) {
       case 'home':
-        return <HomeContent />;
+        return <HomeContent dateRange={dateRange} />;
       case 'oil-impact':
         return <OilImpactContent dateRange={dateRange} />;
       case 'compressor-incident':
         return <CompressorIncidentContent dateRange={dateRange} />;
       default:
-        return <HomeContent />;
+        return <HomeContent dateRange={dateRange} />;
     }
   };
 

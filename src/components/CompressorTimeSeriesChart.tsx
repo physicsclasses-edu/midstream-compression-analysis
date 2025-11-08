@@ -1,8 +1,9 @@
 'use client';
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceArea } from 'recharts';
-import { useState, useEffect, useRef } from 'react';
-import { Maximize2, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Maximize2, Minimize2, ChevronDown, Settings, RotateCcw } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 // Incident interface - exported for use in parent component
 export interface Incident {
@@ -15,8 +16,7 @@ export interface Incident {
 }
 
 interface CompressorTimeSeriesChartProps {
-  compressors: string[];
-  variables: string[];
+  availableCompressors: string[];
   dateRange: { from: string; to: string };
   onIncidentsGenerated?: (incidents: Incident[]) => void;
 }
@@ -24,20 +24,134 @@ interface CompressorTimeSeriesChartProps {
 // Define which variables use right axis
 const RIGHT_AXIS_VARIABLES = ['Discharge Pressure (psi)', 'Gas Temperature (F)'];
 
-// Color palette for different compressors and variables
-const COLORS: { [key: string]: string } = {
-  'Rock Creek 1-Discharge Pressure (psi)': '#3b82f6', // blue
-  'Rock Creek 1-Suction Pressure (psi)': '#10b981', // green
-  'Rock Creek 1-Gas Flow Rate (MCFD)': '#f59e0b', // amber
-  'Rock Creek 1-Gas Temperature (F)': '#8b5cf6', // purple
-  'Rock Creek 2-Discharge Pressure (psi)': '#ec4899', // pink
-  'Rock Creek 2-Suction Pressure (psi)': '#06b6d4', // cyan
-  'Rock Creek 2-Gas Flow Rate (MCFD)': '#ef4444', // red
-  'Rock Creek 2-Gas Temperature (F)': '#f97316', // orange
-  'Wyatt-Discharge Pressure (psi)': '#84cc16', // lime
-  'Wyatt-Suction Pressure (psi)': '#14b8a6', // teal
-  'Wyatt-Gas Flow Rate (MCFD)': '#a855f7', // violet
-  'Wyatt-Gas Temperature (F)': '#f43f5e', // rose
+// All available variables
+const ALL_VARIABLES = [
+  'Discharge Pressure (psi)',
+  'Suction Pressure (psi)',
+  'Gas Flow Rate (MCFD)',
+  'Gas Temperature (F)',
+];
+
+// Base colors for compressors (matching Time-Series Analysis palette)
+const COMPRESSOR_BASE_COLORS: string[] = [
+  "#4E79A7", // Blue for first compressor
+  "#F28E2B", // Orange for second compressor
+  "#E15759", // Red for third compressor
+  "#76B7B2", // Teal for fourth compressor
+  "#59A14F", // Green for fifth compressor
+  "#EDC949", // Yellow for sixth compressor
+];
+
+// Generate color for compressor-variable combination
+const getCompressorVariableColor = (compressorIndex: number, variableIndex: number): string => {
+  const baseColor = COMPRESSOR_BASE_COLORS[compressorIndex % COMPRESSOR_BASE_COLORS.length];
+
+  // For each variable, adjust the color slightly
+  // Variable 0: base color
+  // Variable 1: lighter shade
+  // Variable 2: darker shade
+  // Variable 3: even lighter shade
+
+  const adjustments = [0, 0.2, -0.15, 0.35]; // brightness adjustments
+  const adjustment = adjustments[variableIndex % adjustments.length];
+
+  return adjustBrightness(baseColor, adjustment);
+};
+
+// Adjust brightness of a color
+const adjustBrightness = (color: string, amount: number): string => {
+  const hex = color.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  const adjust = (channel: number) => {
+    const adjusted = Math.round(channel * (1 + amount));
+    return Math.min(255, Math.max(0, adjusted));
+  };
+
+  const newR = adjust(r);
+  const newG = adjust(g);
+  const newB = adjust(b);
+
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
+// Utility function to adjust color brightness for theme
+const adjustColorBrightness = (color: string, isDark: boolean): string => {
+  const hex = color.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  const factor = isDark ? 1.10 : 1.0; // Lighten by 10% in dark mode
+
+  const adjustChannel = (channel: number) => {
+    const adjusted = Math.round(channel * factor);
+    return Math.min(255, Math.max(0, adjusted));
+  };
+
+  const newR = adjustChannel(r);
+  const newG = adjustChannel(g);
+  const newB = adjustChannel(b);
+
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
+// Utility function to increase saturation
+const increaseSaturation = (color: string, percent: number): string => {
+  const hex = color.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+
+  if (delta === 0) return color;
+
+  const lightness = (max + min) / 2;
+  const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+  const newSaturation = Math.min(1, saturation * (1 + percent / 100));
+
+  let hue = 0;
+  if (max === r) {
+    hue = ((g - b) / delta + (g < b ? 6 : 0)) / 6;
+  } else if (max === g) {
+    hue = ((b - r) / delta + 2) / 6;
+  } else {
+    hue = ((r - g) / delta + 4) / 6;
+  }
+
+  const hslToRgb = (h: number, s: number, l: number) => {
+    let rNew, gNew, bNew;
+    if (s === 0) {
+      rNew = gNew = bNew = l;
+    } else {
+      const hue2rgb = (p: number, q: number, t: number) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+      };
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      rNew = hue2rgb(p, q, h + 1/3);
+      gNew = hue2rgb(p, q, h);
+      bNew = hue2rgb(p, q, h - 1/3);
+    }
+    return {
+      r: Math.round(rNew * 255),
+      g: Math.round(gNew * 255),
+      b: Math.round(bNew * 255)
+    };
+  };
+
+  const rgb = hslToRgb(hue, newSaturation, lightness);
+  return `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
 };
 
 // Deterministic random function for SSR compatibility
@@ -58,12 +172,11 @@ const generateOfflinePeriods = (compressors: string[]) => {
     const numPeriods = Math.floor(seededRandom(seed) * 3) + 2;
 
     for (let i = 0; i < numPeriods; i++) {
-      const day = Math.floor(seededRandom(seed + i * 10) * 21); // Random day 0-20
-      const startHour = Math.floor(seededRandom(seed + i * 10 + 2) * 20); // Start between 0-19
-      const duration = Math.floor(seededRandom(seed + i * 10 + 5) * 3) + 1; // Duration 1-3 hours
+      const day = Math.floor(seededRandom(seed + i * 10) * 21);
+      const startHour = Math.floor(seededRandom(seed + i * 10 + 2) * 20);
+      const duration = Math.floor(seededRandom(seed + i * 10 + 5) * 3) + 1;
       const endHour = Math.min(startHour + duration, 23);
 
-      // Avoid overlapping periods on the same day
       const overlaps = periods.some(p =>
         p.day === day && (
           (startHour >= p.start && startHour <= p.end) ||
@@ -87,7 +200,6 @@ const generateIncidentTimeline = (compressors: string[], offlinePeriods: { [key:
   const incidents: Incident[] = [];
   const startDate = new Date(2024, 0, 1);
 
-  // Add compressor offline incidents
   compressors.forEach((compressor) => {
     const periods = offlinePeriods[compressor] || [];
     periods.forEach((period) => {
@@ -107,12 +219,12 @@ const generateIncidentTimeline = (compressors: string[], offlinePeriods: { [key:
     });
   });
 
-  // Add random capacity exceeded incidents across 21 days
-  const numCapacityIncidents = Math.floor(seededRandom(999) * 4) + 2; // 2-5 incidents
+  // Add random capacity exceeded incidents
+  const numCapacityIncidents = Math.floor(seededRandom(999) * 4) + 2;
   for (let i = 0; i < numCapacityIncidents; i++) {
-    const day = Math.floor(seededRandom(888 + i * 50) * 21); // Random day 0-20
-    const startHour = Math.floor(seededRandom(888 + i * 50 + 10) * 18) + 2; // Start between 2-19
-    const duration = Math.floor(seededRandom(888 + i * 50 + 20) * 3) + 2; // Duration 2-4 hours
+    const day = Math.floor(seededRandom(888 + i * 50) * 21);
+    const startHour = Math.floor(seededRandom(888 + i * 50 + 10) * 18) + 2;
+    const duration = Math.floor(seededRandom(888 + i * 50 + 20) * 3) + 2;
     const endHour = Math.min(startHour + duration, 23);
 
     const incidentDate = new Date(startDate);
@@ -128,7 +240,6 @@ const generateIncidentTimeline = (compressors: string[], offlinePeriods: { [key:
     });
   }
 
-  // Sort by day and start time
   incidents.sort((a, b) => {
     const [aDate, aTime] = a.startTime.split(' ');
     const [bDate, bTime] = b.startTime.split(' ');
@@ -145,73 +256,14 @@ const generateIncidentTimeline = (compressors: string[], offlinePeriods: { [key:
   return incidents;
 };
 
-// Calculate days between two dates
-const calculateDaysBetween = (from: string, to: string): number => {
-  const fromDate = new Date(from);
-  const toDate = new Date(to);
-  const diffTime = Math.abs(toDate.getTime() - fromDate.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays + 1; // Include both start and end days
-};
-
-// Generate daily data for multi-day ranges (more than 2 days)
-const generateDailyData = (compressors: string[], variables: string[], dateRange: { from: string; to: string }, offlinePeriods: { [key: string]: { day: number; start: number; end: number }[] }) => {
-  const data = [];
-  const fromDate = new Date(dateRange.from);
-  const toDate = new Date(dateRange.to);
-
-  // Base values for different variables
-  const variableBases: { [key: string]: { base: number, variance: number } } = {
-    'Discharge Pressure (psi)': { base: 1050, variance: 80 },
-    'Suction Pressure (psi)': { base: 170, variance: 25 },
-    'Gas Flow Rate (MCFD)': { base: 850, variance: 120 },
-    'Gas Temperature (F)': { base: 185, variance: 15 },
-  };
-
-  // Generate data for each day
-  let currentDate = new Date(fromDate);
-  let dayIndex = 0;
-
-  while (currentDate <= toDate) {
-    const dateString = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-    const dataPoint: any = {
-      date: dateString,
-      dayIndex: dayIndex,
-      timestamp: currentDate.toISOString().split('T')[0],
-    };
-
-    // Generate data for each compressor and variable combination
-    compressors.forEach((compressor, compressorIndex) => {
-      variables.forEach((variable, variableIndex) => {
-        const config = variableBases[variable] || { base: 100, variance: 10 };
-        const seed = dayIndex * 1000 + compressorIndex * 100 + variableIndex * 10;
-        const variance = (seededRandom(seed) - 0.5) * config.variance;
-
-        // Add some daily variation
-        const dailyFactor = 0.95 + seededRandom(seed + 1) * 0.1;
-        const value = config.base * dailyFactor + variance;
-
-        const key = `${compressor}-${variable}`;
-        dataPoint[key] = Math.max(0, Number(value.toFixed(2)));
-      });
-    });
-
-    data.push(dataPoint);
-    currentDate.setDate(currentDate.getDate() + 1);
-    dayIndex++;
-  }
-
-  return data;
-};
-
-// Generate 21 days of hourly time series data (504 data points)
+// Generate 21 days of hourly time series data
 const generateHourlyData = (compressors: string[], variables: string[], dateRange: { from: string; to: string }, offlinePeriods: { [key: string]: { day: number; start: number; end: number }[] }) => {
   const data = [];
-  const startDate = new Date(2024, 0, 1); // January 1, 2024
-  const totalDays = 21; // Always 21 days
 
-  // Base values for different variables
+  const startDate = dateRange.from ? new Date(dateRange.from) : new Date(2024, 0, 1);
+  const endDate = dateRange.to ? new Date(dateRange.to) : new Date(2024, 0, 22);
+  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
   const variableBases: { [key: string]: { base: number, variance: number } } = {
     'Discharge Pressure (psi)': { base: 1050, variance: 80 },
     'Suction Pressure (psi)': { base: 170, variance: 25 },
@@ -219,7 +271,6 @@ const generateHourlyData = (compressors: string[], variables: string[], dateRang
     'Gas Temperature (F)': { base: 185, variance: 15 },
   };
 
-  // Generate hourly data for 21 days
   for (let day = 0; day <= totalDays; day++) {
     for (let hour = 0; hour < 24; hour++) {
       const currentDate = new Date(startDate);
@@ -238,9 +289,7 @@ const generateHourlyData = (compressors: string[], variables: string[], dateRang
         index: day * 24 + hour,
       };
 
-      // Generate data for each compressor and variable combination
       compressors.forEach((compressor, compressorIndex) => {
-        // Check if compressor is offline during this hour
         const isOffline = offlinePeriods[compressor]?.some(
           period => day === period.day && hour >= period.start && hour <= period.end
         );
@@ -253,15 +302,13 @@ const generateHourlyData = (compressors: string[], variables: string[], dateRang
           let value = 0;
 
           if (isOffline) {
-            // Compressor offline - value is 0
             value = 0;
           } else {
-            // Add some hourly patterns (lower at night, higher during day)
             let hourlyFactor = 1.0;
             if (hour >= 6 && hour <= 18) {
-              hourlyFactor = 1.05 + seededRandom(seed + 1) * 0.1; // Higher during day
+              hourlyFactor = 1.05 + seededRandom(seed + 1) * 0.1;
             } else {
-              hourlyFactor = 0.95 - seededRandom(seed + 2) * 0.05; // Lower at night
+              hourlyFactor = 0.95 - seededRandom(seed + 2) * 0.05;
             }
 
             value = config.base * hourlyFactor + variance;
@@ -279,56 +326,233 @@ const generateHourlyData = (compressors: string[], variables: string[], dateRang
   return data;
 };
 
-export default function CompressorTimeSeriesChart({ compressors, variables, dateRange, onIncidentsGenerated }: CompressorTimeSeriesChartProps) {
+export default function CompressorTimeSeriesChart({ availableCompressors, dateRange, onIncidentsGenerated }: CompressorTimeSeriesChartProps) {
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
   // Fullscreen state and ref
   const [isFullScreen, setIsFullScreen] = useState(false);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
-  // Legend toggle state - track which series are visible
-  const allSeries = compressors.flatMap(compressor =>
-    variables.map(variable => `${compressor}-${variable}`)
+  // Compressor selection (multi-select)
+  const [selectedCompressors, setSelectedCompressors] = useState<string[]>([availableCompressors[0]] || []);
+  const [isCompressorDropdownOpen, setIsCompressorDropdownOpen] = useState(false);
+  const compressorDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Variable visibility state - only Suction and Discharge Pressure visible by default
+  const [visibleVariables, setVisibleVariables] = useState<{[key: string]: boolean}>(() =>
+    ALL_VARIABLES.reduce((acc, variable) => ({
+      ...acc,
+      [variable]: variable === 'Suction Pressure (psi)' || variable === 'Discharge Pressure (psi)'
+    }), {})
   );
-  const [visibleSeries, setVisibleSeries] = useState<{[key: string]: boolean}>(() =>
-    allSeries.reduce((acc, series) => ({ ...acc, [series]: true }), {})
-  );
 
-  // Hover state - track which series is being hovered
-  const [hoveredSeries, setHoveredSeries] = useState<string | null>(null);
+  // Hover state
+  const [hoveredVariable, setHoveredVariable] = useState<string | null>(null);
 
-  // Update visible series when compressors or variables change
-  useEffect(() => {
-    setVisibleSeries(allSeries.reduce((acc, series) => ({ ...acc, [series]: true }), {}));
-  }, [compressors.join(','), variables.join(',')]);
+  // Mouse zoom/pan state
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<number | null>(null);
+  const chartAreaRef = useRef<HTMLDivElement>(null);
 
-  // Toggle series visibility
-  const toggleSeries = (series: string) => {
-    setVisibleSeries(prev => ({ ...prev, [series]: !prev[series] }));
+  // Chart style customization state
+  const defaultChartStyles = {
+    axisTitleSize: 11,
+    tickTextSize: 11,
+    axisLineWidth: 1,
+    gridOpacity: 0.2,
+    chartLineWidth: 2,
+    legendSize: 14,
+    legendPosition: 'center' as 'left' | 'center' | 'right',
   };
 
-  // Generate data immediately on render (deterministic, so SSR-safe)
-  // Always use hourly data for 21 days
-  const offlinePeriods = generateOfflinePeriods(compressors);
-  const data = generateHourlyData(compressors, variables, dateRange, offlinePeriods);
-  const incidents = generateIncidentTimeline(compressors, offlinePeriods);
+  const [chartStyles, setChartStyles] = useState(defaultChartStyles);
+  const [isStylePanelOpen, setIsStylePanelOpen] = useState(false);
+  const stylePanelRef = useRef<HTMLDivElement>(null);
 
-  // Time range slider state (in days: 0-21)
+  // Reset chart styles to default
+  const resetChartStyles = () => {
+    setChartStyles(defaultChartStyles);
+  };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (compressorDropdownRef.current && !compressorDropdownRef.current.contains(event.target as Node)) {
+        setIsCompressorDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Close style panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (stylePanelRef.current && !stylePanelRef.current.contains(event.target as Node)) {
+        setIsStylePanelOpen(false);
+      }
+    };
+    if (isStylePanelOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isStylePanelOpen]);
+
+  // Toggle compressor selection
+  const toggleCompressor = (compressor: string) => {
+    setSelectedCompressors(prev =>
+      prev.includes(compressor)
+        ? prev.filter(c => c !== compressor)
+        : [...prev, compressor]
+    );
+  };
+
+  // Toggle variable visibility
+  const toggleVariable = (variable: string) => {
+    setVisibleVariables(prev => ({ ...prev, [variable]: !prev[variable] }));
+  };
+
+  // Get color for a specific series (compressor-variable combination)
+  const getSeriesColor = (compressor: string, variable: string, isHovered: boolean = false): string => {
+    const compressorIndex = availableCompressors.indexOf(compressor);
+    const variableIndex = ALL_VARIABLES.indexOf(variable);
+    const baseColor = getCompressorVariableColor(compressorIndex, variableIndex);
+
+    if (!mounted) return baseColor;
+
+    const isDark = resolvedTheme === 'dark' || theme === 'dark';
+    let adjustedColor = adjustColorBrightness(baseColor, isDark);
+
+    if (isHovered) {
+      adjustedColor = increaseSaturation(adjustedColor, 10);
+    }
+
+    return adjustedColor;
+  };
+
+  // Calculate total days
+  const calculateTotalDays = () => {
+    if (!dateRange.from || !dateRange.to) return 21;
+    const start = new Date(dateRange.from);
+    const end = new Date(dateRange.to);
+    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const totalDays = calculateTotalDays();
+
+  // Get visible variables - memoized to prevent infinite loops
+  const visibleVariablesList = useMemo(
+    () => ALL_VARIABLES.filter(v => visibleVariables[v]),
+    [JSON.stringify(visibleVariables)]
+  );
+
+  // Generate data - memoized to prevent infinite loops
+  const { data, incidents } = useMemo(() => {
+    const offlinePeriods = generateOfflinePeriods(selectedCompressors);
+    const generatedData = generateHourlyData(selectedCompressors, visibleVariablesList, dateRange, offlinePeriods);
+    const generatedIncidents = generateIncidentTimeline(selectedCompressors, offlinePeriods);
+    return { data: generatedData, incidents: generatedIncidents };
+  }, [selectedCompressors.join(','), visibleVariablesList.join(','), dateRange.from, dateRange.to]);
+
+  // Time range slider state
   const [rangeStart, setRangeStart] = useState(0);
-  const [rangeEnd, setRangeEnd] = useState(21);
+  const [rangeEnd, setRangeEnd] = useState(totalDays);
 
-  // Calculate visible data based on slider range (convert day indices to hour indices)
   const startHourIndex = rangeStart * 24;
   const endHourIndex = (rangeEnd + 1) * 24;
   const visibleData = data.slice(startHourIndex, endHourIndex);
 
-  // Notify parent of incidents on mount/update
   useEffect(() => {
-    if (onIncidentsGenerated) {
+    setRangeStart(0);
+    setRangeEnd(totalDays);
+  }, [totalDays]);
+
+  useEffect(() => {
+    if (onIncidentsGenerated && incidents.length > 0) {
       onIncidentsGenerated(incidents);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compressors, variables, dateRange.from, dateRange.to]);
+  }, [incidents, onIncidentsGenerated]);
 
-  // Fullscreen toggle function
+  // Mouse wheel zoom handler
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!e.shiftKey) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const zoomFactor = 0.1;
+    const currentRange = rangeEnd - rangeStart;
+    const zoomAmount = Math.max(1, Math.round(currentRange * zoomFactor));
+
+    if (e.deltaY < 0) {
+      if (currentRange > 2) {
+        const newStart = rangeStart + zoomAmount;
+        const newEnd = rangeEnd - zoomAmount;
+        if (newEnd > newStart) {
+          setRangeStart(newStart);
+          setRangeEnd(newEnd);
+        }
+      }
+    } else {
+      const newStart = Math.max(0, rangeStart - zoomAmount);
+      const newEnd = Math.min(totalDays, rangeEnd + zoomAmount);
+      setRangeStart(newStart);
+      setRangeEnd(newEnd);
+    }
+  };
+
+  // Mouse pan handlers
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button === 0) {
+      setIsPanning(true);
+      setPanStart(e.clientX);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isPanning || panStart === null || !chartAreaRef.current) return;
+
+    const rect = chartAreaRef.current.getBoundingClientRect();
+    const chartWidth = rect.width;
+    const deltaX = e.clientX - panStart;
+    const currentRange = rangeEnd - rangeStart;
+
+    const panAmount = Math.round((deltaX / chartWidth) * currentRange);
+
+    if (panAmount !== 0) {
+      const newStart = Math.max(0, rangeStart - panAmount);
+      const newEnd = Math.min(totalDays, rangeEnd - panAmount);
+
+      if (newEnd - newStart === currentRange) {
+        setRangeStart(newStart);
+        setRangeEnd(newEnd);
+        setPanStart(e.clientX);
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+    setPanStart(null);
+  };
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isPanning) {
+        setIsPanning(false);
+        setPanStart(null);
+      }
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isPanning]);
+
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
       chartContainerRef.current?.requestFullscreen();
@@ -339,7 +563,6 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
     }
   };
 
-  // Listen for fullscreen changes
   useEffect(() => {
     const handleFullScreenChange = () => {
       setIsFullScreen(!!document.fullscreenElement);
@@ -348,25 +571,26 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
     return () => document.removeEventListener('fullscreenchange', handleFullScreenChange);
   }, []);
 
-  // Determine if we need dual axes
-  const hasLeftAxisVariables = variables.some(v => !RIGHT_AXIS_VARIABLES.includes(v));
-  const hasRightAxisVariables = variables.some(v => RIGHT_AXIS_VARIABLES.includes(v));
+  const hasLeftAxisVariables = visibleVariablesList.some(v => !RIGHT_AXIS_VARIABLES.includes(v));
+  const hasRightAxisVariables = visibleVariablesList.some(v => RIGHT_AXIS_VARIABLES.includes(v));
 
-  // Check if we need to show thresholds
-  const showSuctionPressureThreshold = variables.includes('Suction Pressure (psi)');
-  const showDischargePressureThreshold = variables.includes('Discharge Pressure (psi)');
+  const showSuctionPressureThreshold = visibleVariablesList.includes('Suction Pressure (psi)');
+  const showDischargePressureThreshold = visibleVariablesList.includes('Discharge Pressure (psi)');
 
-  // Format date range for display
   const formatDateRange = () => {
     const fromDate = new Date(dateRange.from);
     const toDate = new Date(dateRange.to);
     return `${fromDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${toDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
   };
 
-  // Custom tooltip
+  const abbreviateCompressor = (compressor: string): string => {
+    if (compressor === 'Rock Creek 1') return 'RC 1';
+    if (compressor === 'Rock Creek 2') return 'RC 2';
+    return compressor;
+  };
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      // Extract full date and time from the data point
       const dataPoint = payload[0].payload;
       const displayLabel = dataPoint.dateTime || label;
 
@@ -377,9 +601,10 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
           <div className="space-y-1">
             {payload.map((entry: any, index: number) => {
               const [compressor, variable] = entry.name.split('-');
+              const abbreviatedCompressor = abbreviateCompressor(compressor);
               return (
                 <p key={index} className="text-sm whitespace-nowrap" style={{ color: entry.color }}>
-                  {compressor}, {variable}: <span className="font-semibold">{entry.value}</span>
+                  {abbreviatedCompressor}, {variable}: <span className="font-semibold">{entry.value}</span>
                 </p>
               );
             })}
@@ -391,17 +616,199 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
   };
 
   return (
-    <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 pb-2 focus:outline-none" style={{ outline: 'none' }} tabIndex={-1}>
+    <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 pb-2 focus:outline-none overflow-auto" style={{ outline: 'none' }} tabIndex={-1}>
       <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            Compressor Performance: {formatDateRange()}
-          </h3>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              Compressor Performance:
+            </h3>
+            {/* Multi-select Compressor Dropdown */}
+            <div className="relative" ref={compressorDropdownRef}>
+              <button
+                onClick={() => setIsCompressorDropdownOpen(!isCompressorDropdownOpen)}
+                className="px-4 py-2 text-base font-semibold bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+              >
+                {selectedCompressors.length > 0
+                  ? selectedCompressors.map(c => abbreviateCompressor(c)).join(', ')
+                  : 'Select compressors'}
+                <ChevronDown className={`w-4 h-4 transition-transform ${isCompressorDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isCompressorDropdownOpen && (
+                <div className="absolute z-30 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-60 overflow-auto min-w-[200px]">
+                  {availableCompressors.map((compressor, index) => (
+                    <button
+                      key={compressor}
+                      onClick={() => toggleCompressor(compressor)}
+                      className={`w-full px-4 py-2.5 text-left transition-colors flex items-center gap-2 ${
+                        index === 0 ? 'rounded-t-lg' : ''
+                      } ${
+                        index === availableCompressors.length - 1 ? 'rounded-b-lg' : ''
+                      } ${
+                        selectedCompressors.includes(compressor)
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCompressors.includes(compressor)}
+                        onChange={() => {}}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                      {compressor}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {compressors.length} compressor{compressors.length > 1 ? 's' : ''} with {variables.length} variable{variables.length > 1 ? 's' : ''} over 21 days with hourly data
+            Showing {selectedCompressors.length} compressor{selectedCompressors.length > 1 ? 's' : ''} with {visibleVariablesList.length} variable{visibleVariablesList.length > 1 ? 's' : ''} over {totalDays} days • <span className="italic">(Shift+Scroll to zoom • Drag to pan)</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Chart Settings Button */}
+          <div className="relative" ref={stylePanelRef}>
+            <button
+              onClick={() => setIsStylePanelOpen(!isStylePanelOpen)}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-1"
+              title="Chart Style Settings"
+            >
+              <Settings className="w-4 h-4" />
+              Chart Style
+            </button>
+
+            {/* Settings Panel Dropdown */}
+            {isStylePanelOpen && (
+              <div className="absolute right-0 top-full mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-4 min-w-[320px] z-50">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">Chart Style Settings</h4>
+                    <button
+                      onClick={resetChartStyles}
+                      className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-1"
+                      title="Reset to Default"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Reset
+                    </button>
+                  </div>
+
+                  {/* Axis Title Size */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Axis Title Size: {chartStyles.axisTitleSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min="8"
+                      max="20"
+                      value={chartStyles.axisTitleSize}
+                      onChange={(e) => setChartStyles({ ...chartStyles, axisTitleSize: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Tick Text Size */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Tick Text Size: {chartStyles.tickTextSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min="8"
+                      max="16"
+                      value={chartStyles.tickTextSize}
+                      onChange={(e) => setChartStyles({ ...chartStyles, tickTextSize: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Axis Line Width */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Axis Line Width: {chartStyles.axisLineWidth}px
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="4"
+                      step="0.5"
+                      value={chartStyles.axisLineWidth}
+                      onChange={(e) => setChartStyles({ ...chartStyles, axisLineWidth: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Grid Opacity */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Grid Opacity: {Math.round(chartStyles.gridOpacity * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={chartStyles.gridOpacity}
+                      onChange={(e) => setChartStyles({ ...chartStyles, gridOpacity: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Chart Line Width */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Chart Line Width: {chartStyles.chartLineWidth}px
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="0.5"
+                      value={chartStyles.chartLineWidth}
+                      onChange={(e) => setChartStyles({ ...chartStyles, chartLineWidth: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Legend Font Size */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Legend Font Size: {chartStyles.legendSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="18"
+                      value={chartStyles.legendSize}
+                      onChange={(e) => setChartStyles({ ...chartStyles, legendSize: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Legend Position */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Legend Position
+                    </label>
+                    <select
+                      value={chartStyles.legendPosition}
+                      onChange={(e) => setChartStyles({ ...chartStyles, legendPosition: e.target.value as 'left' | 'center' | 'right' })}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={toggleFullScreen}
             className="px-3 py-1.5 text-sm font-medium rounded-lg border bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-1"
@@ -422,31 +829,36 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
       </div>
 
       {/* Chart */}
-      <div className="w-full outline-none" style={{ height: '500px' }}>
+      <div
+        ref={chartAreaRef}
+        className="w-full outline-none"
+        style={{
+          height: '500px',
+          cursor: isPanning ? 'grabbing' : 'grab',
+          userSelect: 'none'
+        }}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleData}
-            margin={{ top: 20, right: 50, left: 20, bottom: 0 }}
+            margin={{ top: 20, right: 20, left: 20, bottom: 0 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
-
-            {/* Offline Period Background Colors */}
-            {compressors.map((compressor) => {
-              const periods = offlinePeriods[compressor] || [];
-              return periods.map((period, idx) => {
-                return (
-                  <ReferenceArea
-                    key={`${compressor}-offline-${idx}`}
-                    x1={period.start}
-                    x2={period.end}
-                    stroke="none"
-                    fill="#ef4444"
-                    fillOpacity={0.2}
-                    ifOverflow="extendDomain"
-                  />
-                );
-              });
-            })}
+            <defs>
+              <filter id="whiteGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+                <feFlood floodColor="#FFFFFF" floodOpacity="0.5" result="glowColor" />
+                <feComposite in="glowColor" in2="blur" operator="in" result="softGlow" />
+                <feMerge>
+                  <feMergeNode in="softGlow" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={chartStyles.gridOpacity} />
 
             {/* Threshold Lines */}
             {showSuctionPressureThreshold && (
@@ -488,76 +900,69 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
             <XAxis
               dataKey="index"
               stroke="#6b7280"
-              tick={{ fill: '#6b7280', fontSize: 9 }}
+              strokeWidth={chartStyles.axisLineWidth}
+              tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
               angle={-45}
               textAnchor="end"
               height={80}
-              ticks={visibleData.filter(d => d.hour === 0).map(d => d.index)}
+              ticks={visibleData.filter(d => d.hour === 0 && d.day % 3 === 0).map(d => d.index)}
               tickFormatter={(value) => {
                 const dataPoint = visibleData.find(d => d.index === value);
                 return dataPoint?.date || '';
               }}
             />
 
-            {/* Left Y-Axis */}
             {hasLeftAxisVariables && (
               <YAxis
                 yAxisId="left"
                 stroke="#3b82f6"
-                tick={{ fill: '#6b7280', fontSize: 11 }}
-                label={{
-                  value: 'Left Axis (Suction Pressure, Gas Flow)',
-                  angle: -90,
-                  position: 'insideLeft',
-                  style: { fill: '#3b82f6', fontSize: 11, textAnchor: 'middle' }
-                }}
+                strokeWidth={chartStyles.axisLineWidth}
+                tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
+                domain={[0, 'auto']}
+                label={{ value: '(Suction Pressure, Gas Flow)', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
               />
             )}
 
-            {/* Right Y-Axis */}
             {hasRightAxisVariables && (
               <YAxis
                 yAxisId="right"
                 orientation="right"
                 stroke="#10b981"
-                tick={{ fill: '#6b7280', fontSize: 11 }}
-                label={{
-                  value: 'Right Axis (Discharge Pressure, Temperature)',
-                  angle: 90,
-                  position: 'insideRight',
-                  style: { fill: '#10b981', fontSize: 11, textAnchor: 'middle' }
-                }}
+                strokeWidth={chartStyles.axisLineWidth}
+                tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
+                domain={[0, 'auto']}
+                label={{ value: '(Discharge Pressure, Temperature)', angle: 90, position: 'insideRight', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
               />
             )}
 
             <Tooltip content={<CustomTooltip />} />
 
             {/* Render lines for each visible compressor-variable combination */}
-            {compressors.map((compressor) =>
-              variables.map((variable) => {
+            {selectedCompressors.map((compressor) =>
+              visibleVariablesList.map((variable) => {
                 const isRightAxis = RIGHT_AXIS_VARIABLES.includes(variable);
                 const key = `${compressor}-${variable}`;
-                const color = COLORS[key] || '#6b7280';
-
-                // Only render if visible
-                if (!visibleSeries[key]) return null;
-
-                const opacity = hoveredSeries === null ? 1 : hoveredSeries === key ? 1 : 0.2;
+                const isHovered = hoveredVariable === variable;
+                const baseOpacity = 0.85;
+                const opacity = hoveredVariable === null ? baseOpacity : isHovered ? 1 : 0.2;
+                const strokeWidth = isHovered ? chartStyles.chartLineWidth + 1 : chartStyles.chartLineWidth;
+                const strokeColor = getSeriesColor(compressor, variable, isHovered);
 
                 return (
                   <Line
                     key={key}
                     type="monotone"
                     dataKey={key}
-                    stroke={color}
-                    strokeWidth={2}
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
                     strokeOpacity={opacity}
                     dot={false}
-                    activeDot={{ r: 4 }}
+                    activeDot={{ r: 4, stroke: '#FFFFFF', strokeWidth: 2, fill: strokeColor }}
                     name={key}
                     yAxisId={isRightAxis ? 'right' : 'left'}
+                    filter={isHovered ? 'url(#whiteGlow)' : undefined}
                   />
                 );
               })
@@ -567,121 +972,134 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
       </div>
 
       {/* Time Range Slider */}
-      <div className="px-16 flex justify-center items-center -mt-8">
-        <div className="relative pt-1 pb-1 w-full max-w-2xl mt-3">
-          {/* Track background */}
-          <div className="absolute top-2 left-0 right-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+      <div className="mt-6" style={{ marginLeft: '85px', marginRight: '85px' }}>
+        <div className="relative" style={{ paddingTop: '0px', paddingBottom: '20px' }}>
+          <div className="absolute top-0 w-full h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
 
-          {/* Selected range highlight */}
           <div
-            className="absolute top-2 h-2 bg-blue-500 dark:bg-blue-600 rounded-lg pointer-events-none z-10"
+            className="absolute top-0 h-1 bg-blue-500 dark:bg-blue-400 rounded-full pointer-events-none"
             style={{
-              left: `${(rangeStart / 21) * 100}%`,
-              right: `${100 - (rangeEnd / 21) * 100}%`
+              left: `${(rangeStart / totalDays) * 100}%`,
+              width: `${((rangeEnd - rangeStart) / totalDays) * 100}%`,
             }}
-          ></div>
+          />
 
-          {/* Start slider */}
           <input
             type="range"
             min="0"
-            max={21}
+            max={totalDays}
             value={rangeStart}
             onChange={(e) => {
-              const value = Number(e.target.value);
-              if (value < rangeEnd) {
-                setRangeStart(value);
+              const newStart = parseInt(e.target.value);
+              if (newStart < rangeEnd) {
+                setRangeStart(newStart);
               }
             }}
-            className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-30 range-slider-start"
-            style={{
-              top: '0.5rem',
-              pointerEvents: 'auto'
-            }}
+            className="range-slider range-slider-start absolute w-full"
+            style={{ zIndex: rangeStart > rangeEnd - 2 ? 5 : 3, top: 0 }}
           />
 
-          {/* End slider */}
           <input
             type="range"
             min="0"
-            max={21}
+            max={totalDays}
             value={rangeEnd}
             onChange={(e) => {
-              const value = Number(e.target.value);
-              if (value > rangeStart) {
-                setRangeEnd(value);
+              const newEnd = parseInt(e.target.value);
+              if (newEnd > rangeStart) {
+                setRangeEnd(newEnd);
               }
             }}
-            className="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer z-40 range-slider-end"
-            style={{
-              top: '0.5rem',
-              pointerEvents: 'auto'
-            }}
+            className="range-slider range-slider-end absolute w-full"
+            style={{ zIndex: 4, top: 0 }}
           />
 
-          {/* Labels below slider */}
-          <div className="flex justify-between mt-4 text-xs text-gray-600 dark:text-gray-400">
-            <span>{data[startHourIndex]?.date}</span>
-            <span>{data[Math.min(endHourIndex - 1, data.length - 1)]?.date}</span>
-          </div>
+          <span
+            className="absolute text-xs font-medium text-gray-700 dark:text-gray-300"
+            style={{
+              left: `${(rangeStart / totalDays) * 100}%`,
+              top: '24px',
+              transform: 'translateX(-50%)'
+            }}
+          >
+            {data[rangeStart * 24]?.date || ''}
+          </span>
+          <span
+            className="absolute text-xs font-medium text-gray-700 dark:text-gray-300"
+            style={{
+              left: `${(rangeEnd / totalDays) * 100}%`,
+              top: '24px',
+              transform: 'translateX(-50%)'
+            }}
+          >
+            {data[rangeEnd * 24]?.date || ''}
+          </span>
         </div>
       </div>
 
-      {/* Custom Interactive Legend */}
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-        {allSeries.map((series) => {
-          const isVisible = visibleSeries[series];
-          const color = COLORS[series] || '#6b7280';
+      {/* Custom Interactive Legend - Variables Only */}
+      <div className={`mt-6 flex flex-wrap items-center gap-x-6 gap-y-6 ${
+        chartStyles.legendPosition === 'left' ? 'justify-start' :
+        chartStyles.legendPosition === 'right' ? 'justify-end' :
+        'justify-center'
+      }`}>
+        {ALL_VARIABLES.map((variable) => {
+          const isVisible = visibleVariables[variable];
+          const isHovered = hoveredVariable === variable;
+          const isRightAxis = RIGHT_AXIS_VARIABLES.includes(variable);
+
+          // Show first compressor's color as representative
+          const representativeColor = getSeriesColor(selectedCompressors[0] || availableCompressors[0], variable, isHovered);
 
           return (
             <button
-              key={series}
-              onClick={() => toggleSeries(series)}
-              onMouseEnter={() => setHoveredSeries(series)}
-              onMouseLeave={() => setHoveredSeries(null)}
-              className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"
+              key={variable}
+              onClick={() => toggleVariable(variable)}
+              onMouseEnter={() => setHoveredVariable(variable)}
+              onMouseLeave={() => setHoveredVariable(null)}
+              className="flex items-center gap-2 cursor-pointer transition-all"
+              style={{
+                filter: isHovered && isVisible ? 'drop-shadow(0 0 3px rgba(255,255,255,0.8))' : 'none'
+              }}
             >
               <svg width="18" height="10" className="flex-shrink-0">
-                {/* Left line */}
                 <line
                   x1="0"
                   y1="5"
                   x2="5"
                   y2="5"
-                  stroke={color}
-                  strokeWidth="2"
-                  opacity={isVisible ? 1 : 0.3}
+                  stroke={representativeColor}
+                  strokeWidth={isHovered && isVisible ? "2.5" : "2"}
+                  opacity={isVisible ? 0.85 : 0.3}
                 />
-                {/* Center hollow circle */}
                 <circle
                   cx="9"
                   cy="5"
                   r="3"
                   fill="none"
-                  stroke={color}
-                  strokeWidth="2"
-                  opacity={isVisible ? 1 : 0.3}
+                  stroke={representativeColor}
+                  strokeWidth={isHovered && isVisible ? "2.5" : "2"}
+                  opacity={isVisible ? 0.85 : 0.3}
                 />
-                {/* Right line */}
                 <line
                   x1="13"
                   y1="5"
                   x2="18"
                   y2="5"
-                  stroke={color}
-                  strokeWidth="2"
-                  opacity={isVisible ? 1 : 0.3}
+                  stroke={representativeColor}
+                  strokeWidth={isHovered && isVisible ? "2.5" : "2"}
+                  opacity={isVisible ? 0.85 : 0.3}
                 />
               </svg>
               <span
-                className="text-sm"
                 style={{
-                  color: isVisible ? color : color,
+                  color: isVisible ? representativeColor : representativeColor,
                   opacity: isVisible ? 1 : 0.4,
-                  textDecoration: isVisible ? 'none' : 'line-through'
+                  textDecoration: isVisible ? 'none' : 'line-through',
+                  fontSize: `${chartStyles.legendSize}px`
                 }}
               >
-                {series}
+                {variable}<sup>{isRightAxis ? 'R' : 'L'}</sup>
               </span>
             </button>
           );
@@ -723,57 +1141,75 @@ export default function CompressorTimeSeriesChart({ compressors, variables, date
           box-shadow: none !important;
         }
 
-        input[type="range"] {
+        /* Range Slider Styles */
+        .range-slider {
           -webkit-appearance: none;
           appearance: none;
+          background: transparent;
+          cursor: pointer;
           pointer-events: none;
+          height: 20px;
         }
 
-        input[type="range"]::-webkit-slider-runnable-track {
-          background: transparent;
-          height: 8px;
-        }
-
-        input[type="range"]::-moz-range-track {
-          background: transparent;
-          height: 8px;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
+        .range-slider::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 20px;
-          height: 20px;
+          pointer-events: all;
+          width: 16px;
+          height: 16px;
           border-radius: 50%;
+          border: 2px solid white;
+          cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          margin-top: -9px;
           background: #3b82f6;
-          cursor: grab;
-          border: 3px solid white;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          position: relative;
-          pointer-events: auto;
-          margin-top: -6px;
         }
 
-        input[type="range"]::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
+        .range-slider::-moz-range-thumb {
+          pointer-events: all;
+          width: 16px;
+          height: 16px;
           border-radius: 50%;
+          border: 2px solid white;
+          cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
           background: #3b82f6;
-          cursor: grab;
-          border: 3px solid white;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          pointer-events: auto;
         }
 
-        input[type="range"]:active::-webkit-slider-thumb {
-          cursor: grabbing;
+        .range-slider-start::-webkit-slider-thumb {
+          background: #3b82f6;
         }
 
-        input[type="range"]:active::-moz-range-thumb {
-          cursor: grabbing;
+        .range-slider-start::-moz-range-thumb {
+          background: #3b82f6;
+        }
+
+        .range-slider-end::-webkit-slider-thumb {
+          background: #3b82f6;
+        }
+
+        .range-slider-end::-moz-range-thumb {
+          background: #3b82f6;
+        }
+
+        .range-slider::-webkit-slider-runnable-track {
+          height: 0;
+          background: transparent;
+        }
+
+        .range-slider::-moz-range-track {
+          height: 0;
+          background: transparent;
+        }
+
+        :global(.dark) .range-slider::-webkit-slider-thumb {
+          background: #60a5fa;
+        }
+
+        :global(.dark) .range-slider::-moz-range-thumb {
+          background: #60a5fa;
         }
       `}</style>
-
     </div>
   );
 }
