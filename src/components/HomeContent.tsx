@@ -16,6 +16,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
   const [mapPosition, setMapPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [hoveredWell, setHoveredWell] = useState<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -214,7 +215,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  <p className="text-base font-medium text-gray-600 dark:text-gray-400">
                     {stat.label}
                   </p>
                 </div>
@@ -224,11 +225,11 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
                       {stat.bblValue}
                     </p>
-                    <div className="flex items-center">
-                      <p className="text-xl font-bold text-red-600 dark:text-red-400">
+                    <div className="flex items-center justify-between">
+                      <p className="text-lg font-bold text-red-600 dark:text-red-400">
                         {stat.dollarValue}
                       </p>
-                      <div className="relative ml-20">
+                      <div className="relative">
                         <select
                           value={benchmarkPrice}
                           onChange={(e) => setBenchmarkPrice(Number(e.target.value))}
@@ -267,7 +268,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
               <BarChart3 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 Monthly Production Impact
               </h3>
             </div>
@@ -284,7 +285,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
               </button>
               <button
                 onClick={() => setChartUnit('$')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors whitespace-nowrap min-w-[110px] ${
                   chartUnit === '$'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -466,8 +467,8 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
 
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 h-[400px] flex flex-col">
           <div className="flex items-center space-x-3 mb-6">
-            <AlertTriangle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               LGS Compressor Non-Compliance Breakdown
             </h3>
           </div>
@@ -614,26 +615,29 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
       </div>
 
       {/* Houston Region Well Status Map */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+      <div
+        className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700"
+        onMouseLeave={() => setHoveredWell(null)}
+      >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <MapPin className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               Houston Region Well Status Map
             </h3>
           </div>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">Operational (18)</span>
+              <div className="w-3.5 h-3.5 bg-green-500 rounded-full shadow-sm"></div>
+              <span className="text-sm font-semibold text-green-700 dark:text-green-400">Operational (18)</span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">Warning (5)</span>
+              <div className="w-3.5 h-3.5 bg-yellow-500 rounded-full shadow-sm"></div>
+              <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-400">Warning (5)</span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">Critical (2)</span>
+              <div className="w-3.5 h-3.5 bg-red-500 rounded-full shadow-sm"></div>
+              <span className="text-sm font-semibold text-red-700 dark:text-red-400">Critical (2)</span>
             </div>
           </div>
         </div>
@@ -812,13 +816,19 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
                 return (
                   <div
                     key={well.id}
-                    className="absolute group cursor-pointer transform -translate-x-1/2 -translate-y-1/2 hover:z-[100]"
-                    style={{ left: `${well.x}%`, top: `${well.y}%` }}
+                    className="absolute cursor-pointer transform -translate-x-1/2 -translate-y-1/2"
+                    style={{ left: `${well.x}%`, top: `${well.y}%`, zIndex: hoveredWell === well.id ? 100 : 10 }}
+                    onMouseEnter={() => setHoveredWell(well.id)}
+                    onMouseLeave={() => setHoveredWell(null)}
                   >
-                    <div className={`w-4 h-4 ${color} rounded-full shadow-lg hover:scale-125 transition-transform duration-200 border-2 border-white dark:border-gray-800`}></div>
+                    <div className={`w-4 h-4 ${color} rounded-full shadow-lg transition-transform duration-200 border-2 border-white dark:border-gray-800 ${
+                      hoveredWell === well.id ? 'scale-125' : ''
+                    }`}></div>
 
                     {/* Enhanced Tooltip */}
-                    <div className={`absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 ${
+                    <div className={`absolute bottom-full mb-2 transition-opacity duration-200 z-50 pointer-events-none ${
+                      hoveredWell === well.id ? 'opacity-100' : 'opacity-0'
+                    } ${
                       well.x > 70 ? 'right-0' : well.x < 30 ? 'left-0' : 'left-1/2 transform -translate-x-1/2'
                     }`}>
                       <div className="bg-white dark:bg-gray-800 rounded-lg px-4 py-3 shadow-xl border border-gray-200 dark:border-gray-600 min-w-[240px]">
@@ -899,7 +909,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-3 mb-6">
           <TrendingDown className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
             Top 10 Wells by Impact
           </h3>
         </div>
@@ -909,19 +919,19 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">
                     Well ID
                   </th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">
                     Lost Prod.
                   </th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">
                     Hours
                   </th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">
                     Impact
                   </th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">
                     Area
                   </th>
                 </tr>
@@ -943,17 +953,17 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
                     key={index}
                     className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   >
-                    <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
+                    <td className="py-4 px-4 text-sm font-semibold text-gray-900 dark:text-white">
                       {well.wellId}
                     </td>
-                    <td className="py-4 px-4 text-gray-600 dark:text-gray-400">
+                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-400">
                       {well.lostProd}
                     </td>
-                    <td className="py-4 px-4 text-gray-600 dark:text-gray-400">
+                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-400">
                       {well.hours}
                     </td>
                     <td className="py-4 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                         well.impact === 'High' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
                         well.impact === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
                         'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
@@ -961,7 +971,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
                         {well.impact}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-gray-600 dark:text-gray-400">
+                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-400">
                       {well.area}
                     </td>
                   </tr>

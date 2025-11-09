@@ -309,6 +309,10 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
   const [isStylePanelOpen, setIsStylePanelOpen] = useState(false);
   const stylePanelRef = useRef<HTMLDivElement>(null);
 
+  // Log scale state for Y axes
+  const [leftLogScale, setLeftLogScale] = useState(false);
+  const [rightLogScale, setRightLogScale] = useState(false);
+
   // Reset chart styles to default
   const resetChartStyles = () => {
     setChartStyles(defaultChartStyles);
@@ -541,7 +545,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
       <div className="mb-6 flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               Time-Series Analysis:
             </h3>
             {wells && wells.length > 0 && onWellChange && (
@@ -751,7 +755,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
       {/* Chart */}
       <div
         ref={chartAreaRef}
-        className="w-full outline-none"
+        className="w-full outline-none relative"
         style={{
           height: '500px',
           cursor: isPanning ? 'grabbing' : 'grab',
@@ -762,6 +766,42 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       >
+        {/* Log Scale Toggle - Left Y-Axis */}
+        {hasLeftAxisMetrics && (
+          <button
+            onClick={() => setLeftLogScale(!leftLogScale)}
+            className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+              leftLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+            style={{ left: '10px', top: '8px' }}
+            title="Toggle logarithmic scale for left Y-axis"
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                leftLogScale ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        )}
+
+        {/* Log Scale Toggle - Right Y-Axis */}
+        {hasRightAxisMetrics && (
+          <button
+            onClick={() => setRightLogScale(!rightLogScale)}
+            className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+              rightLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+            style={{ right: '10px', top: '8px' }}
+            title="Toggle logarithmic scale for right Y-axis"
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                rightLogScale ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        )}
+
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleData}
@@ -833,14 +873,14 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
             {showLinePressureThreshold && (
               <ReferenceLine
                 y={150}
-                stroke="#ef4444"
+                stroke="#c026d3"
                 strokeDasharray="5 5"
                 strokeWidth={2}
                 yAxisId="left"
                 label={{
                   value: 'Line Pressure Threshold (150)',
                   position: 'insideTopLeft',
-                  fill: '#ef4444',
+                  fill: '#c026d3',
                   fontSize: 12,
                   fontWeight: 'bold'
                 }}
@@ -850,7 +890,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
             {showGasInjectionPressureThreshold && (
               <ReferenceLine
                 y={1000}
-                stroke="#f59e0b"
+                stroke="#06b6d4"
                 strokeDasharray="5 5"
                 strokeWidth={2}
                 yAxisId="right"
@@ -859,7 +899,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
                   position: 'insideRight',
                   dy: -15,
                   dx: -10,
-                  fill: '#f59e0b',
+                  fill: '#06b6d4',
                   fontSize: 12,
                   fontWeight: 'bold'
                 }}
@@ -889,7 +929,8 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
                 strokeWidth={chartStyles.axisLineWidth}
                 tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
-                domain={[0, 'auto']}
+                scale={leftLogScale ? 'log' : 'auto'}
+                domain={leftLogScale ? ['auto', 'auto'] : [0, 'auto']}
                 label={{ value: '(Pressure, Production, etc.)', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
               />
             )}
@@ -903,7 +944,8 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
                 strokeWidth={chartStyles.axisLineWidth}
                 tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
-                domain={[0, 'auto']}
+                scale={rightLogScale ? 'log' : 'auto'}
+                domain={rightLogScale ? ['auto', 'auto'] : [0, 'auto']}
                 label={{ value: '(Gas Injection, Casing, etc.)', angle: 90, position: 'insideRight', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
               />
             )}
@@ -1190,21 +1232,21 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
       </div>
 
       {/* Phase Details - Outside fullscreen container */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="mt-6 px-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-          <h4 className="font-semibold text-green-800 dark:text-green-400 mb-1">Natural Flow</h4>
+          <h4 className="text-sm font-semibold text-green-800 dark:text-green-400 mb-1">Natural Flow</h4>
           <p className="text-sm text-green-600 dark:text-green-300">
             {data[0]?.date} to {data[7 * 24]?.date}: Well producing naturally with gradual decline
           </p>
         </div>
         <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
-          <h4 className="font-semibold text-red-800 dark:text-red-400 mb-1">Shut-in</h4>
+          <h4 className="text-sm font-semibold text-red-800 dark:text-red-400 mb-1">Shut-in</h4>
           <p className="text-sm text-red-600 dark:text-red-300">
             {data[3 * 24]?.date} to {data[4 * 24]?.date}: 2-day maintenance | {data[7 * 24]?.date} to {data[9 * 24]?.date}: 3-day transition
           </p>
         </div>
         <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
-          <h4 className="font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Gas Lift</h4>
+          <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Gas Lift</h4>
           <p className="text-sm text-blue-600 dark:text-blue-300">
             {data[9 * 24]?.date} to {data[data.length - 1]?.date}: Compression active, improved production
           </p>

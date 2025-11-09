@@ -372,6 +372,10 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
   const [isStylePanelOpen, setIsStylePanelOpen] = useState(false);
   const stylePanelRef = useRef<HTMLDivElement>(null);
 
+  // Log scale state for Y axes
+  const [leftLogScale, setLeftLogScale] = useState(false);
+  const [rightLogScale, setRightLogScale] = useState(false);
+
   // Reset chart styles to default
   const resetChartStyles = () => {
     setChartStyles(defaultChartStyles);
@@ -622,7 +626,7 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
       <div className="mb-6 flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               Compressor Performance:
             </h3>
             {/* Multi-select Compressor Dropdown */}
@@ -833,7 +837,7 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
       {/* Chart */}
       <div
         ref={chartAreaRef}
-        className="w-full outline-none"
+        className="w-full outline-none relative"
         style={{
           height: '500px',
           cursor: isPanning ? 'grabbing' : 'grab',
@@ -844,6 +848,42 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       >
+        {/* Log Scale Toggle - Left Y-Axis */}
+        {hasLeftAxisVariables && (
+          <button
+            onClick={() => setLeftLogScale(!leftLogScale)}
+            className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+              leftLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+            style={{ left: '10px', top: '8px' }}
+            title="Toggle logarithmic scale for left Y-axis"
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                leftLogScale ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        )}
+
+        {/* Log Scale Toggle - Right Y-Axis */}
+        {hasRightAxisVariables && (
+          <button
+            onClick={() => setRightLogScale(!rightLogScale)}
+            className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+              rightLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+            style={{ right: '10px', top: '8px' }}
+            title="Toggle logarithmic scale for right Y-axis"
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                rightLogScale ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        )}
+
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleData}
@@ -866,14 +906,14 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
             {showSuctionPressureThreshold && (
               <ReferenceLine
                 y={150}
-                stroke="#ef4444"
+                stroke="#c026d3"
                 strokeDasharray="5 5"
                 strokeWidth={2}
                 yAxisId="left"
                 label={{
                   value: 'Suction Pressure Threshold (150)',
                   position: 'insideTopLeft',
-                  fill: '#ef4444',
+                  fill: '#c026d3',
                   fontSize: 12,
                   fontWeight: 'bold'
                 }}
@@ -883,7 +923,7 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
             {showDischargePressureThreshold && (
               <ReferenceLine
                 y={1000}
-                stroke="#f59e0b"
+                stroke="#06b6d4"
                 strokeDasharray="5 5"
                 strokeWidth={2}
                 yAxisId="right"
@@ -892,7 +932,7 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
                   position: 'insideRight',
                   dy: -15,
                   dx: -10,
-                  fill: '#f59e0b',
+                  fill: '#06b6d4',
                   fontSize: 12,
                   fontWeight: 'bold'
                 }}
@@ -921,7 +961,8 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
                 strokeWidth={chartStyles.axisLineWidth}
                 tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
-                domain={[0, 'auto']}
+                scale={leftLogScale ? 'log' : 'auto'}
+                domain={leftLogScale ? ['auto', 'auto'] : [0, 'auto']}
                 label={{ value: '(Suction Pressure, Gas Flow)', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
               />
             )}
@@ -934,7 +975,8 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
                 strokeWidth={chartStyles.axisLineWidth}
                 tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
-                domain={[0, 'auto']}
+                scale={rightLogScale ? 'log' : 'auto'}
+                domain={rightLogScale ? ['auto', 'auto'] : [0, 'auto']}
                 label={{ value: '(Discharge Pressure, Temperature)', angle: 90, position: 'insideRight', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
               />
             )}
