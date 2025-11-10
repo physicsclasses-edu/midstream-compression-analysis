@@ -930,8 +930,9 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
                 tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
                 scale={leftLogScale ? 'log' : 'auto'}
-                domain={leftLogScale ? ['auto', 'auto'] : [0, 'auto']}
-                label={{ value: '(Pressure, Production, etc.)', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
+                domain={leftLogScale ? [1, 'auto'] : [0, 'auto']}
+                allowDataOverflow={leftLogScale}
+                label={{ value: '(Pressure, Production, etc.)', angle: -90, position: 'center', dx: -20, style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize, textAnchor: 'middle' } }}
               />
             )}
 
@@ -945,8 +946,9 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
                 tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
                 scale={rightLogScale ? 'log' : 'auto'}
-                domain={rightLogScale ? ['auto', 'auto'] : [0, 'auto']}
-                label={{ value: '(Gas Injection, Casing, etc.)', angle: 90, position: 'insideRight', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
+                domain={rightLogScale ? [1, 'auto'] : [0, 'auto']}
+                allowDataOverflow={rightLogScale}
+                label={{ value: '(Gas Injection, Casing, etc.)', angle: 90, position: 'center', dx: 20, style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize, textAnchor: 'middle' } }}
               />
             )}
 

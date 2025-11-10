@@ -219,27 +219,6 @@ const generateIncidentTimeline = (compressors: string[], offlinePeriods: { [key:
     });
   });
 
-  // Add random capacity exceeded incidents
-  const numCapacityIncidents = Math.floor(seededRandom(999) * 4) + 2;
-  for (let i = 0; i < numCapacityIncidents; i++) {
-    const day = Math.floor(seededRandom(888 + i * 50) * 21);
-    const startHour = Math.floor(seededRandom(888 + i * 50 + 10) * 18) + 2;
-    const duration = Math.floor(seededRandom(888 + i * 50 + 20) * 3) + 2;
-    const endHour = Math.min(startHour + duration, 23);
-
-    const incidentDate = new Date(startDate);
-    incidentDate.setDate(incidentDate.getDate() + day);
-    const dateString = `${incidentDate.getMonth() + 1}/${incidentDate.getDate()}`;
-
-    incidents.push({
-      startTime: `${dateString} ${startHour.toString().padStart(2, '0')}:00`,
-      endTime: `${dateString} ${endHour.toString().padStart(2, '0')}:00`,
-      type: 'capacity',
-      description: 'System Capacity Exceeded',
-      duration: endHour - startHour
-    });
-  }
-
   incidents.sort((a, b) => {
     const [aDate, aTime] = a.startTime.split(' ');
     const [bDate, bTime] = b.startTime.split(' ');
@@ -962,8 +941,9 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
                 tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
                 scale={leftLogScale ? 'log' : 'auto'}
-                domain={leftLogScale ? ['auto', 'auto'] : [0, 'auto']}
-                label={{ value: '(Suction Pressure, Gas Flow)', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
+                domain={leftLogScale ? [1, 'auto'] : [0, 'auto']}
+                allowDataOverflow={leftLogScale}
+                label={{ value: '(Suction Pressure, Gas Flow)', angle: -90, position: 'center', dx: -20, style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize, textAnchor: 'middle' } }}
               />
             )}
 
@@ -976,8 +956,9 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
                 tick={{ fill: '#6b7280', fontSize: chartStyles.tickTextSize }}
                 width={65}
                 scale={rightLogScale ? 'log' : 'auto'}
-                domain={rightLogScale ? ['auto', 'auto'] : [0, 'auto']}
-                label={{ value: '(Discharge Pressure, Temperature)', angle: 90, position: 'insideRight', style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize } }}
+                domain={rightLogScale ? [1, 'auto'] : [0, 'auto']}
+                allowDataOverflow={rightLogScale}
+                label={{ value: '(Discharge Pressure, Temperature)', angle: 90, position: 'center', dx: 20, style: { fill: '#6b7280', fontSize: chartStyles.axisTitleSize, textAnchor: 'middle' } }}
               />
             )}
 
