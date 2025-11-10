@@ -542,9 +542,10 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
   return (
     <>
       <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none overflow-auto" style={{ outline: 'none' }} tabIndex={-1}>
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
+      <div className="mb-6">
+        {/* Top row: Title/Well and Buttons */}
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-3">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               Time-Series Analysis:
             </h3>
@@ -588,11 +589,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
               </div>
             )}
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {Object.values(visibleMetrics).filter(v => v).length} metric{Object.values(visibleMetrics).filter(v => v).length > 1 ? 's' : ''} over {totalDays} days with phase transitions • <span className="italic">(Shift+Scroll to zoom • Drag to pan)</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
           {/* Chart Settings Button */}
           <div className="relative" ref={stylePanelRef}>
             <button
@@ -749,6 +746,29 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
               </>
             )}
           </button>
+          </div>
+        </div>
+
+        {/* Bottom row: Showing text and Phase Legend */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Showing {Object.values(visibleMetrics).filter(v => v).length} metric{Object.values(visibleMetrics).filter(v => v).length > 1 ? 's' : ''} over {totalDays} days with phase transitions • <span className="italic">(Shift+Scroll to zoom • Drag to pan)</span>
+          </p>
+          {/* Phase Legend - Right aligned */}
+          <div className="flex items-center gap-3 text-sm whitespace-nowrap">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-[#bbf7d0] dark:bg-[#34d399] dark:opacity-25"></div>
+              <span className="text-gray-700 dark:text-gray-300">Natural Flow</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-[#fee2e2] dark:bg-[#f87171] dark:opacity-25"></div>
+              <span className="text-gray-700 dark:text-gray-300">Shut-in</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-[#dbeafe] dark:bg-[#60a5fa] dark:opacity-25"></div>
+              <span className="text-gray-700 dark:text-gray-300">Continuous Gas Lift</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -773,7 +793,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
             className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
               leftLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
             }`}
-            style={{ left: '10px', top: '8px' }}
+            style={{ left: '0px', top: '8px' }}
             title="Toggle logarithmic scale for left Y-axis"
           >
             <span
@@ -791,7 +811,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
             className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
               rightLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
             }`}
-            style={{ right: '10px', top: '8px' }}
+            style={{ right: '0px', top: '8px' }}
             title="Toggle logarithmic scale for right Y-axis"
           >
             <span
@@ -805,7 +825,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleData}
-            margin={{ top: 20, right: 20, left: 20, bottom: 0 }}
+            margin={{ top: 20, right: 5, left: 5, bottom: 0 }}
           >
             <defs>
               <filter id="whiteGlow" x="-50%" y="-50%" width="200%" height="200%">
@@ -820,54 +840,92 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={chartStyles.gridOpacity} />
 
-            {/* Background phases - Using index for x-axis matching */}
-            {visibleData.length > 0 && (
-              <>
-                {/* Natural Phase: Days 0-7 - Green background */}
-                {rangeStart <= 7 && rangeEnd >= 0 && (
-                  <ReferenceArea
-                    x1={visibleData[Math.max(0, (0 - rangeStart) * 24)]?.index}
-                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(7, rangeEnd) - rangeStart) * 24 + 23)]?.index}
-                    stroke="none"
-                    fill="#10b981"
-                    fillOpacity={0.15}
-                  />
-                )}
+            {/* Background phases - Matching card colors */}
+            {mounted && visibleData.length > 0 && (() => {
+              const isDarkMode = resolvedTheme === 'dark' || theme === 'dark';
+              const phaseColors = isDarkMode
+                ? { natural: '#34d399', shutin: '#f87171', continuous: '#60a5fa', opacity: 0.25 }
+                : { natural: '#bbf7d0', shutin: '#fee2e2', continuous: '#dbeafe', opacity: 1.0 };
 
-                {/* First Shut-In: Days 3-4 (overlays on Natural) - Red background */}
-                {rangeStart <= 4 && rangeEnd >= 3 && (
-                  <ReferenceArea
-                    x1={visibleData[Math.max(0, (3 - rangeStart) * 24)]?.index}
-                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(4, rangeEnd) - rangeStart) * 24 + 23)]?.index}
-                    stroke="none"
-                    fill="#ef4444"
-                    fillOpacity={0.15}
-                  />
-                )}
+              // Get visible range boundaries
+              const firstVisibleIndex = visibleData[0]?.index || 0;
+              const lastVisibleIndex = visibleData[visibleData.length - 1]?.index || 0;
 
-                {/* Second Shut-In: Days 7-9 (transition period) - Red background */}
-                {rangeStart <= 9 && rangeEnd >= 7 && (
-                  <ReferenceArea
-                    x1={visibleData[Math.max(0, (7 - rangeStart) * 24)]?.index}
-                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(9, rangeEnd) - rangeStart) * 24 + 23)]?.index}
-                    stroke="none"
-                    fill="#ef4444"
-                    fillOpacity={0.15}
-                  />
-                )}
+              // Phase boundaries (absolute indices) - Overlap by 1 to avoid gaps
+              const natural1Start = 0;
+              const natural1End = 3 * 24; // Days 0-2 (8/12-8/14) - overlap into day 3
+              const shutin1Start = 3 * 24;
+              const shutin1End = 5 * 24; // Days 3-4 (8/15-8/16) - overlap into day 5
+              const natural2Start = 5 * 24;
+              const natural2End = 7 * 24; // Days 5-6 (8/17-8/18) - overlap into day 7
+              const shutin2Start = 7 * 24;
+              const shutin2End = 10 * 24; // Days 7-9 (8/19-8/21) - overlap into day 10
+              const continuousStart = 10 * 24; // Day 10+ (8/22+)
 
-                {/* Continuous Phase: Days 9-totalDays - Blue background */}
-                {rangeEnd >= 9 && rangeStart <= totalDays && (
-                  <ReferenceArea
-                    x1={visibleData[Math.max(0, (9 - rangeStart) * 24)]?.index}
-                    x2={visibleData[Math.min(visibleData.length - 1, (Math.min(totalDays, rangeEnd) - rangeStart) * 24 + 23)]?.index}
-                    stroke="none"
-                    fill="#3b82f6"
-                    fillOpacity={0.15}
-                  />
-                )}
-              </>
-            )}
+              return (
+                <>
+                  {/* Natural Flow Phase 1: Days 0-2 (8/12-8/14) - Green background */}
+                  {natural1End >= firstVisibleIndex && natural1Start <= lastVisibleIndex && (
+                    <ReferenceArea
+                      x1={Math.max(natural1Start, firstVisibleIndex)}
+                      x2={Math.min(natural1End, lastVisibleIndex)}
+                      yAxisId="left"
+                      stroke="none"
+                      fill={phaseColors.natural}
+                      fillOpacity={phaseColors.opacity}
+                    />
+                  )}
+
+                  {/* Shut-In Phase 1: Days 3-4 (8/15-8/16) - Red background */}
+                  {shutin1End >= firstVisibleIndex && shutin1Start <= lastVisibleIndex && (
+                    <ReferenceArea
+                      x1={Math.max(shutin1Start, firstVisibleIndex)}
+                      x2={Math.min(shutin1End, lastVisibleIndex)}
+                      yAxisId="left"
+                      stroke="none"
+                      fill={phaseColors.shutin}
+                      fillOpacity={phaseColors.opacity}
+                    />
+                  )}
+
+                  {/* Natural Flow Phase 2: Days 5-6 (8/17-8/18) - Green background */}
+                  {natural2End >= firstVisibleIndex && natural2Start <= lastVisibleIndex && (
+                    <ReferenceArea
+                      x1={Math.max(natural2Start, firstVisibleIndex)}
+                      x2={Math.min(natural2End, lastVisibleIndex)}
+                      yAxisId="left"
+                      stroke="none"
+                      fill={phaseColors.natural}
+                      fillOpacity={phaseColors.opacity}
+                    />
+                  )}
+
+                  {/* Shut-In Phase 2: Days 7-9 (8/19-8/21) - Red background */}
+                  {shutin2End >= firstVisibleIndex && shutin2Start <= lastVisibleIndex && (
+                    <ReferenceArea
+                      x1={Math.max(shutin2Start, firstVisibleIndex)}
+                      x2={Math.min(shutin2End, lastVisibleIndex)}
+                      yAxisId="left"
+                      stroke="none"
+                      fill={phaseColors.shutin}
+                      fillOpacity={phaseColors.opacity}
+                    />
+                  )}
+
+                  {/* Continuous Phase: Days 9+ - Blue background */}
+                  {continuousStart <= lastVisibleIndex && (
+                    <ReferenceArea
+                      x1={Math.max(continuousStart, firstVisibleIndex)}
+                      x2={lastVisibleIndex}
+                      yAxisId="left"
+                      stroke="none"
+                      fill={phaseColors.continuous}
+                      fillOpacity={phaseColors.opacity}
+                    />
+                  )}
+                </>
+              );
+            })()}
 
             {/* Threshold Lines */}
             {showLinePressureThreshold && (
@@ -984,7 +1042,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
       </div>
 
       {/* Time Range Slider */}
-      <div className="mt-6" style={{ marginLeft: '85px', marginRight: '85px' }}>
+      <div className="mt-4" style={{ marginLeft: '70px', marginRight: '70px' }}>
         <div className="relative" style={{ paddingTop: '0px', paddingBottom: '20px' }}>
           {/* Range track background */}
           <div className="absolute top-0 w-full h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
@@ -1233,27 +1291,6 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
       `}</style>
       </div>
 
-      {/* Phase Details - Outside fullscreen container */}
-      <div className="mt-6 px-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-          <h4 className="text-sm font-semibold text-green-800 dark:text-green-400 mb-1">Natural Flow</h4>
-          <p className="text-sm text-green-600 dark:text-green-300">
-            {data[0]?.date} to {data[7 * 24]?.date}: Well producing naturally with gradual decline
-          </p>
-        </div>
-        <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
-          <h4 className="text-sm font-semibold text-red-800 dark:text-red-400 mb-1">Shut-in</h4>
-          <p className="text-sm text-red-600 dark:text-red-300">
-            {data[3 * 24]?.date} to {data[4 * 24]?.date}: 2-day maintenance | {data[7 * 24]?.date} to {data[9 * 24]?.date}: 3-day transition
-          </p>
-        </div>
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
-          <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Gas Lift</h4>
-          <p className="text-sm text-blue-600 dark:text-blue-300">
-            {data[9 * 24]?.date} to {data[data.length - 1]?.date}: Compression active, improved production
-          </p>
-        </div>
-      </div>
     </>
   );
 }
