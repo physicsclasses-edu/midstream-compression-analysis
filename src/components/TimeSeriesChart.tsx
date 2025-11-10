@@ -542,9 +542,10 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
   return (
     <>
       <div ref={chartContainerRef} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none overflow-auto" style={{ outline: 'none' }} tabIndex={-1}>
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
+      <div className="mb-6">
+        {/* Top row: Title/Well and Buttons */}
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-3">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               Time-Series Analysis:
             </h3>
@@ -588,11 +589,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
               </div>
             )}
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {Object.values(visibleMetrics).filter(v => v).length} metric{Object.values(visibleMetrics).filter(v => v).length > 1 ? 's' : ''} over {totalDays} days with phase transitions • <span className="italic">(Shift+Scroll to zoom • Drag to pan)</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
           {/* Chart Settings Button */}
           <div className="relative" ref={stylePanelRef}>
             <button
@@ -749,6 +746,29 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
               </>
             )}
           </button>
+          </div>
+        </div>
+
+        {/* Bottom row: Showing text and Phase Legend */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Showing {Object.values(visibleMetrics).filter(v => v).length} metric{Object.values(visibleMetrics).filter(v => v).length > 1 ? 's' : ''} over {totalDays} days with phase transitions • <span className="italic">(Shift+Scroll to zoom • Drag to pan)</span>
+          </p>
+          {/* Phase Legend - Right aligned */}
+          <div className="flex items-center gap-3 text-sm whitespace-nowrap">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#bbf7d0' }}></div>
+              <span className="text-gray-700 dark:text-gray-300">Natural Flow</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#fee2e2' }}></div>
+              <span className="text-gray-700 dark:text-gray-300">Shut-in</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#dbeafe' }}></div>
+              <span className="text-gray-700 dark:text-gray-300">Continuous Gas Lift</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -773,7 +793,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
             className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
               leftLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
             }`}
-            style={{ left: '10px', top: '8px' }}
+            style={{ left: '0px', top: '8px' }}
             title="Toggle logarithmic scale for left Y-axis"
           >
             <span
@@ -791,7 +811,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
             className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
               rightLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
             }`}
-            style={{ right: '10px', top: '8px' }}
+            style={{ right: '0px', top: '8px' }}
             title="Toggle logarithmic scale for right Y-axis"
           >
             <span
@@ -805,7 +825,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleData}
-            margin={{ top: 20, right: 20, left: 20, bottom: 0 }}
+            margin={{ top: 20, right: 5, left: 5, bottom: 0 }}
           >
             <defs>
               <filter id="whiteGlow" x="-50%" y="-50%" width="200%" height="200%">
@@ -1022,7 +1042,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
       </div>
 
       {/* Time Range Slider */}
-      <div className="mt-6" style={{ marginLeft: '85px', marginRight: '85px' }}>
+      <div className="mt-4" style={{ marginLeft: '70px', marginRight: '70px' }}>
         <div className="relative" style={{ paddingTop: '0px', paddingBottom: '20px' }}>
           {/* Range track background */}
           <div className="absolute top-0 w-full h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
@@ -1271,27 +1291,6 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
       `}</style>
       </div>
 
-      {/* Phase Details - Outside fullscreen container */}
-      <div className="mt-6 px-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-          <h4 className="text-sm font-semibold text-green-800 dark:text-green-400 mb-1">Natural Flow</h4>
-          <p className="text-sm text-green-600 dark:text-green-300">
-            {data[0]?.date} to {data[2 * 24]?.date} & {data[5 * 24]?.date} to {data[6 * 24]?.date}: Well producing naturally
-          </p>
-        </div>
-        <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
-          <h4 className="text-sm font-semibold text-red-800 dark:text-red-400 mb-1">Shut-in</h4>
-          <p className="text-sm text-red-600 dark:text-red-300">
-            {data[3 * 24]?.date} to {data[4 * 24]?.date} & {data[7 * 24]?.date} to {data[9 * 24]?.date}: Maintenance periods
-          </p>
-        </div>
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
-          <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-400 mb-1">Continuous Gas Lift</h4>
-          <p className="text-sm text-blue-600 dark:text-blue-300">
-            {data[10 * 24]?.date} onwards: Compression active, improved production
-          </p>
-        </div>
-      </div>
     </>
   );
 }
