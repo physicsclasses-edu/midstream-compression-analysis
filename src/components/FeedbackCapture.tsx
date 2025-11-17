@@ -31,7 +31,7 @@ export default function FeedbackCapture({ isOpen, onClose }: FeedbackCaptureProp
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [selectedTool, setSelectedTool] = useState<Tool>('pen');
   const [isDrawing, setIsDrawing] = useState(false);
-  const [drawActions, setDrawActions] = useState<DrawAction[]>({});
+  const [drawActions, setDrawActions] = useState<DrawAction[]>([]);
   const [currentAction, setCurrentAction] = useState<DrawAction | null>(null);
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
