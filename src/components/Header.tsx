@@ -1,12 +1,14 @@
 'use client';
 
-import { Bell, Sun, Moon, LogOut } from 'lucide-react';
+import { Bell, Sun, Moon, LogOut, MessageSquare } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
+import FeedbackCapture from './FeedbackCapture';
 
 export default function Header() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -27,6 +29,14 @@ export default function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setIsFeedbackOpen(true)}
+              className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 hover:scale-105"
+              title="Feedback & Screenshot"
+            >
+              <MessageSquare size={20} />
+            </button>
+
             <button
               className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 hover:scale-105"
               title="Notifications"
@@ -51,6 +61,7 @@ export default function Header() {
           </div>
         </div>
       </div>
+      <FeedbackCapture isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
     </header>
   );
 }

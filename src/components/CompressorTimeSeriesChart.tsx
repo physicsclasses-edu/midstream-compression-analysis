@@ -834,7 +834,7 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
             className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
               leftLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
             }`}
-            style={{ left: '10px', top: '8px' }}
+            style={{ left: '0px', top: '8px' }}
             title="Toggle logarithmic scale for left Y-axis"
           >
             <span
@@ -852,7 +852,7 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
             className={`absolute z-10 inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
               rightLogScale ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
             }`}
-            style={{ right: '10px', top: '8px' }}
+            style={{ right: '0px', top: '8px' }}
             title="Toggle logarithmic scale for right Y-axis"
           >
             <span
@@ -866,7 +866,7 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={visibleData}
-            margin={{ top: 20, right: 20, left: 20, bottom: 0 }}
+            margin={{ top: 20, right: 5, left: 5, bottom: 0 }}
           >
             <defs>
               <filter id="whiteGlow" x="-50%" y="-50%" width="200%" height="200%">
@@ -997,7 +997,7 @@ export default function CompressorTimeSeriesChart({ availableCompressors, dateRa
       </div>
 
       {/* Time Range Slider */}
-      <div className="mt-6" style={{ marginLeft: '85px', marginRight: '85px' }}>
+      <div className="mt-6" style={{ marginLeft: '70px', marginRight: '70px' }}>
         <div className="relative" style={{ paddingTop: '0px', paddingBottom: '20px' }}>
           <div className="absolute top-0 w-full h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
 
