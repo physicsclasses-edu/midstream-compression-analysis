@@ -74,14 +74,14 @@ export default function FeedbackCapture({ isOpen, onClose }: FeedbackCaptureProp
 
   const handleStartSelection = (e: React.MouseEvent) => {
     if (captureMode !== 'selecting') return;
-    // Use page coordinates including scroll
+    // Use pageX/pageY which includes scroll offset
     setSelectionStart({ x: e.pageX, y: e.pageY });
     setSelectionEnd({ x: e.pageX, y: e.pageY });
   };
 
   const handleMoveSelection = (e: React.MouseEvent) => {
     if (captureMode !== 'selecting' || !selectionStart) return;
-    // Use page coordinates including scroll
+    // Use pageX/pageY which includes scroll offset
     setSelectionEnd({ x: e.pageX, y: e.pageY });
   };
 
@@ -119,40 +119,42 @@ export default function FeedbackCapture({ isOpen, onClose }: FeedbackCaptureProp
       // Show overlay again
       overlay.style.opacity = '1';
 
-      // Calculate the scale factor between the canvas and actual document
+      // Calculate the scale factor
       const scaleX = canvas.width / document.documentElement.scrollWidth;
       const scaleY = canvas.height / document.documentElement.scrollHeight;
+
+      // Get any offset from html element
+      const htmlTop = document.documentElement.getBoundingClientRect().top + window.scrollY;
+      const htmlLeft = document.documentElement.getBoundingClientRect().left + window.scrollX;
 
       console.log('Debug info:', {
         canvasSize: { width: canvas.width, height: canvas.height },
         documentSize: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
+        htmlOffset: { top: htmlTop, left: htmlLeft },
         scale: { x: scaleX, y: scaleY },
         selection: { x, y, width, height },
-        scaledSelection: {
-          x: x * scaleX,
-          y: y * scaleY,
-          width: width * scaleX,
-          height: height * scaleY
-        }
+        adjustedSelection: { x: x - htmlLeft, y: y - htmlTop, width, height },
+        cropCoords: { sx: (x - htmlLeft) * scaleX, sy: (y - htmlTop) * scaleY, sw: width * scaleX, sh: height * scaleY }
       });
 
-      // The canvas from html2canvas uses the actual page dimensions
-      // We need to crop based on our selection coordinates
+      // Create cropped canvas
       const croppedCanvas = document.createElement('canvas');
       const ctx = croppedCanvas.getContext('2d');
 
-      // Set the cropped canvas size to match the selection (scaled)
+      // Adjust coordinates for html element offset
+      const adjustedX = x - htmlLeft;
+      const adjustedY = y - htmlTop;
+
       croppedCanvas.width = width * scaleX;
       croppedCanvas.height = height * scaleY;
 
       if (ctx) {
-        // Draw the cropped portion using scaled coordinates
         ctx.drawImage(
           canvas,
-          x * scaleX, y * scaleY, // Source x, y (where to start cropping from source)
-          width * scaleX, height * scaleY, // Source width, height (how much to crop)
-          0, 0, // Destination x, y (where to draw on destination canvas)
-          width * scaleX, height * scaleY // Destination width, height (size on destination canvas)
+          adjustedX * scaleX, adjustedY * scaleY,
+          width * scaleX, height * scaleY,
+          0, 0,
+          width * scaleX, height * scaleY
         );
       }
 
@@ -465,7 +467,7 @@ export default function FeedbackCapture({ isOpen, onClose }: FeedbackCaptureProp
 
       // Here you would typically send this to your backend API
       // For now, we'll create a mailto link with the feedback
-      const mailtoLink = `mailto:${email}?subject=Feedback - Midstream AI Simulator&body=${encodeURIComponent(
+      const mailtoLink = `mailto:${email}?subject=Feedback - NOVA&body=${encodeURIComponent(
         `Feedback Description:\n${description}\n\nPlease find the screenshot attached (you'll need to implement server-side email handling to attach the image).`
       )}`;
 
@@ -799,15 +801,13 @@ export default function FeedbackCapture({ isOpen, onClose }: FeedbackCaptureProp
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Your Email *
+                  Username
                 </label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your.email@example.com"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
-                  required
+                  type="text"
+                  value="baytex"
+                  readOnly
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                 />
               </div>
 

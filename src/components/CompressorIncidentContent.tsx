@@ -89,9 +89,7 @@ export default function CompressorIncidentContent({ dateRange }: CompressorIncid
             © 2025 Ayata. All rights reserved. No part of this product may be reproduced or transmitted without prior written permission.
           </p>
           <div className="flex justify-center space-x-6">
-            <a href="#" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">Privacy Policy</a>
-            <a href="#" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">Terms of Service</a>
-            <a href="#" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">Contact: info@ayata.com</a>
+            <a href="#" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">Contact: baytex@ayata.com</a>
           </div>
         </div>
       </footer>
