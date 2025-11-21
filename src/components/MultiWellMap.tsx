@@ -224,7 +224,7 @@ export default function MultiWellMap({ onNext }: MultiWellMapProps) {
     if (!mounted) return;
 
     // Override scroll behavior temporarily when toolbar is used
-    const handleToolbarClick = (e: MouseEvent) => {
+    const handleToolbarClick = (e: Event) => {
       // Save current scroll position
       const scrollY = window.scrollY;
       const scrollX = window.scrollX;
