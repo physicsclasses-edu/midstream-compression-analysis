@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Header from '@/components/Header';
-import Navigation from '@/components/Navigation';
 import HomeContent from '@/components/HomeContent';
 import OilImpactContent from '@/components/OilImpactContent';
 import CompressorIncidentContent from '@/components/CompressorIncidentContent';
@@ -31,8 +30,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header />
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} onDateRangeChange={setDateRange} />
+      <Header
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onDateRangeChange={setDateRange}
+      />
 
       <main className="container mx-auto px-6 py-4">
         {renderContent()}

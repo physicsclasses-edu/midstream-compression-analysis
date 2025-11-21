@@ -108,53 +108,53 @@ export default function FeedbackCapture({ isOpen, onClose }: FeedbackCaptureProp
       // Small delay to ensure overlay is hidden
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Capture the entire document
+      // Get device pixel ratio for proper scaling
+      const dpr = window.devicePixelRatio || 1;
+
+      // Capture the entire document at native resolution
       const canvas = await html2canvas(document.documentElement, {
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
+        scale: dpr,
       });
 
       // Show overlay again
       overlay.style.opacity = '1';
 
-      // Calculate the scale factor
-      const scaleX = canvas.width / document.documentElement.scrollWidth;
-      const scaleY = canvas.height / document.documentElement.scrollHeight;
-
-      // Get any offset from html element
-      const htmlTop = document.documentElement.getBoundingClientRect().top + window.scrollY;
-      const htmlLeft = document.documentElement.getBoundingClientRect().left + window.scrollX;
+      // Calculate the actual scale factor (canvas pixels / screen pixels)
+      const scaleX = canvas.width / (document.documentElement.scrollWidth * dpr);
+      const scaleY = canvas.height / (document.documentElement.scrollHeight * dpr);
 
       console.log('Debug info:', {
+        dpr,
         canvasSize: { width: canvas.width, height: canvas.height },
         documentSize: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
-        htmlOffset: { top: htmlTop, left: htmlLeft },
         scale: { x: scaleX, y: scaleY },
         selection: { x, y, width, height },
-        adjustedSelection: { x: x - htmlLeft, y: y - htmlTop, width, height },
-        cropCoords: { sx: (x - htmlLeft) * scaleX, sy: (y - htmlTop) * scaleY, sw: width * scaleX, sh: height * scaleY }
       });
 
-      // Create cropped canvas
+      // Create cropped canvas - account for device pixel ratio
       const croppedCanvas = document.createElement('canvas');
       const ctx = croppedCanvas.getContext('2d');
 
-      // Adjust coordinates for html element offset
-      const adjustedX = x - htmlLeft;
-      const adjustedY = y - htmlTop;
-
-      croppedCanvas.width = width * scaleX;
-      croppedCanvas.height = height * scaleY;
+      // Set canvas size at device resolution
+      croppedCanvas.width = width * dpr;
+      croppedCanvas.height = height * dpr;
 
       if (ctx) {
+        // Draw the selected region accounting for DPR and scale
         ctx.drawImage(
           canvas,
-          adjustedX * scaleX, adjustedY * scaleY,
-          width * scaleX, height * scaleY,
-          0, 0,
-          width * scaleX, height * scaleY
+          x * dpr * scaleX,
+          y * dpr * scaleY,
+          width * dpr * scaleX,
+          height * dpr * scaleY,
+          0,
+          0,
+          width * dpr,
+          height * dpr
         );
       }
 

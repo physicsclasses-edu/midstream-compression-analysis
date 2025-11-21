@@ -1,7 +1,27 @@
 'use client';
 
 import { TrendingDown, AlertTriangle, TrendingUp, ChevronDown, ZoomIn, ZoomOut, Move, MapPin, BarChart3 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
+import type { Map as LeafletMap } from 'leaflet';
+
+// Dynamically import Leaflet components with SSR disabled
+const MapContainer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const Marker = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Marker),
+  { ssr: false }
+);
+const Popup = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Popup),
+  { ssr: false }
+);
 
 interface HomeContentProps {
   dateRange?: { from: string; to: string };
@@ -12,46 +32,67 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
   const [chartUnit, setChartUnit] = useState<'BBL' | '$'>('BBL');
   const [mounted, setMounted] = useState(false);
   const [hoveredMonth, setHoveredMonth] = useState<number | null>(null);
-  const [mapZoom, setMapZoom] = useState(1);
-  const [mapPosition, setMapPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [hoveredWell, setHoveredWell] = useState<number | null>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const houstonCenter: [number, number] = [29.7604, -95.3698];
+
+  // Helper function to create well icon
+  const createWellIcon = (status: string) => {
+    if (typeof window === 'undefined') return null;
+
+    const L = require('leaflet');
+    let color;
+
+    if (status === 'Operational') {
+      color = '#10b981'; // green-500
+    } else if (status === 'Warning') {
+      color = '#eab308'; // yellow-500
+    } else {
+      color = '#ef4444'; // red-500
+    }
+
+    return L.divIcon({
+      html: `
+        <div class="w-4 h-4 rounded-full shadow-lg border-2 border-white dark:border-gray-800 transition-transform duration-200" style="background-color: ${color};"></div>
+      `,
+      className: 'custom-well-marker',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+    });
+  };
 
   useEffect(() => {
     setMounted(true);
+
+    // Fix for Leaflet marker icons in Next.js
+    if (typeof window !== 'undefined') {
+      const L = require('leaflet');
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+      });
+    }
   }, []);
 
   // Map interaction functions
   const handleZoomIn = () => {
-    setMapZoom(prev => Math.min(prev * 1.5, 4));
-  };
-
-  const handleZoomOut = () => {
-    setMapZoom(prev => Math.max(prev / 1.5, 0.5));
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - mapPosition.x, y: e.clientY - mapPosition.y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      setMapPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
+    if (mapRef.current) {
+      mapRef.current.zoomIn();
     }
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
+  const handleZoomOut = () => {
+    if (mapRef.current) {
+      mapRef.current.zoomOut();
+    }
   };
 
   const resetMapView = () => {
-    setMapZoom(1);
-    setMapPosition({ x: 0, y: 0 });
+    if (mapRef.current) {
+      mapRef.current.setView(houstonCenter, 10);
+    }
   };
 
   const priceOptions = [
@@ -131,45 +172,46 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
   };
 
   // Static well positions and statuses based on Houston geography
+  // Wells positioned using actual Houston lat/lng coordinates
   const wellsData = [
     // Ship Channel area wells (Southeast Houston)
-    { id: 1, x: 75, y: 65, status: 'Operational', name: 'Ship Channel Alpha', production: 1247, gasPressure: 2850, nonCompliantHours: 0 },
-    { id: 2, x: 82, y: 70, status: 'Operational', name: 'Bayport Station', production: 982, gasPressure: 2920, nonCompliantHours: 0 },
-    { id: 3, x: 88, y: 75, status: 'Warning', name: 'Gulf Coast Unit', production: 756, gasPressure: 2650, nonCompliantHours: 14 },
-    { id: 4, x: 85, y: 62, status: 'Operational', name: 'Channel View', production: 1156, gasPressure: 2780, nonCompliantHours: 0 },
-    { id: 5, x: 78, y: 72, status: 'Critical', name: 'Refinery Junction', production: 423, gasPressure: 2180, nonCompliantHours: 67 },
+    { id: 1, lat: 29.685, lng: -95.055, status: 'Operational', name: 'Ship Channel Alpha', production: 1247, gasPressure: 2850, nonCompliantHours: 0 },
+    { id: 2, lat: 29.650, lng: -94.980, status: 'Operational', name: 'Bayport Station', production: 982, gasPressure: 2920, nonCompliantHours: 0 },
+    { id: 3, lat: 29.615, lng: -94.920, status: 'Warning', name: 'Gulf Coast Unit', production: 756, gasPressure: 2650, nonCompliantHours: 14 },
+    { id: 4, lat: 29.736, lng: -94.965, status: 'Operational', name: 'Channel View', production: 1156, gasPressure: 2780, nonCompliantHours: 0 },
+    { id: 5, lat: 29.656, lng: -95.020, status: 'Critical', name: 'Refinery Junction', production: 423, gasPressure: 2180, nonCompliantHours: 67 },
 
     // Energy Corridor and West Houston wells
-    { id: 6, x: 15, y: 45, status: 'Operational', name: 'Energy Plaza', production: 1345, gasPressure: 3120, nonCompliantHours: 0 },
-    { id: 7, x: 22, y: 50, status: 'Operational', name: 'Westchase Hub', production: 1189, gasPressure: 2890, nonCompliantHours: 0 },
-    { id: 8, x: 28, y: 42, status: 'Warning', name: 'Katy Freeway Unit', production: 834, gasPressure: 2420, nonCompliantHours: 18 },
-    { id: 9, x: 18, y: 55, status: 'Operational', name: 'Memorial Station', production: 1067, gasPressure: 2950, nonCompliantHours: 0 },
+    { id: 6, lat: 29.785, lng: -95.665, status: 'Operational', name: 'Energy Plaza', production: 1345, gasPressure: 3120, nonCompliantHours: 0 },
+    { id: 7, lat: 29.750, lng: -95.600, status: 'Operational', name: 'Westchase Hub', production: 1189, gasPressure: 2890, nonCompliantHours: 0 },
+    { id: 8, lat: 29.806, lng: -95.550, status: 'Warning', name: 'Katy Freeway Unit', production: 834, gasPressure: 2420, nonCompliantHours: 18 },
+    { id: 9, lat: 29.715, lng: -95.625, status: 'Operational', name: 'Memorial Station', production: 1067, gasPressure: 2950, nonCompliantHours: 0 },
 
     // North Houston / Woodlands area
-    { id: 10, x: 45, y: 20, status: 'Operational', name: 'Woodlands North', production: 1423, gasPressure: 3240, nonCompliantHours: 0 },
-    { id: 11, x: 52, y: 15, status: 'Operational', name: 'Spring Branch', production: 1298, gasPressure: 3180, nonCompliantHours: 0 },
-    { id: 12, x: 38, y: 25, status: 'Warning', name: 'Tomball Junction', production: 712, gasPressure: 2380, nonCompliantHours: 12 },
-    { id: 13, x: 58, y: 22, status: 'Operational', name: 'North Harris', production: 1534, gasPressure: 3350, nonCompliantHours: 0 },
+    { id: 10, lat: 29.960, lng: -95.395, status: 'Operational', name: 'Woodlands North', production: 1423, gasPressure: 3240, nonCompliantHours: 0 },
+    { id: 11, lat: 29.995, lng: -95.332, status: 'Operational', name: 'Spring Branch', production: 1298, gasPressure: 3180, nonCompliantHours: 0 },
+    { id: 12, lat: 29.925, lng: -95.458, status: 'Warning', name: 'Tomball Junction', production: 712, gasPressure: 2380, nonCompliantHours: 12 },
+    { id: 13, lat: 29.946, lng: -95.278, status: 'Operational', name: 'North Harris', production: 1534, gasPressure: 3350, nonCompliantHours: 0 },
 
     // Southwest Houston (near refineries)
-    { id: 14, x: 35, y: 65, status: 'Operational', name: 'Sugar Land Unit', production: 1267, gasPressure: 2820, nonCompliantHours: 0 },
-    { id: 15, x: 42, y: 70, status: 'Operational', name: 'Fort Bend Station', production: 1134, gasPressure: 2740, nonCompliantHours: 0 },
-    { id: 16, x: 48, y: 75, status: 'Critical', name: 'Southwest Terminal', production: 398, gasPressure: 2050, nonCompliantHours: 84 },
-    { id: 17, x: 40, y: 78, status: 'Operational', name: 'Brazoria Unit', production: 1089, gasPressure: 2690, nonCompliantHours: 0 },
+    { id: 14, lat: 29.685, lng: -95.485, status: 'Operational', name: 'Sugar Land Unit', production: 1267, gasPressure: 2820, nonCompliantHours: 0 },
+    { id: 15, lat: 29.650, lng: -95.422, status: 'Operational', name: 'Fort Bend Station', production: 1134, gasPressure: 2740, nonCompliantHours: 0 },
+    { id: 16, lat: 29.615, lng: -95.368, status: 'Critical', name: 'Southwest Terminal', production: 398, gasPressure: 2050, nonCompliantHours: 84 },
+    { id: 17, lat: 29.571, lng: -95.440, status: 'Operational', name: 'Brazoria Unit', production: 1089, gasPressure: 2690, nonCompliantHours: 0 },
 
     // Southeast coastal area
-    { id: 18, x: 70, y: 80, status: 'Warning', name: 'Galveston Bay', production: 678, gasPressure: 2290, nonCompliantHours: 16 },
-    { id: 19, x: 65, y: 85, status: 'Operational', name: 'Clear Lake Station', production: 1456, gasPressure: 3080, nonCompliantHours: 0 },
-    { id: 20, x: 75, y: 88, status: 'Operational', name: 'Coastal Terminal', production: 1312, gasPressure: 2960, nonCompliantHours: 0 },
+    { id: 18, lat: 29.560, lng: -95.080, status: 'Warning', name: 'Galveston Bay', production: 678, gasPressure: 2290, nonCompliantHours: 16 },
+    { id: 19, lat: 29.525, lng: -95.125, status: 'Operational', name: 'Clear Lake Station', production: 1456, gasPressure: 3080, nonCompliantHours: 0 },
+    { id: 20, lat: 29.484, lng: -95.055, status: 'Operational', name: 'Coastal Terminal', production: 1312, gasPressure: 2960, nonCompliantHours: 0 },
 
     // Northwest Houston area
-    { id: 21, x: 25, y: 30, status: 'Operational', name: 'Northwest Hub', production: 1178, gasPressure: 2850, nonCompliantHours: 0 },
-    { id: 22, x: 32, y: 35, status: 'Warning', name: 'Cypress Station', production: 789, gasPressure: 2340, nonCompliantHours: 9 },
-    { id: 23, x: 20, y: 25, status: 'Operational', name: 'Willowbrook Unit', production: 1401, gasPressure: 3190, nonCompliantHours: 0 },
+    { id: 21, lat: 29.890, lng: -95.575, status: 'Operational', name: 'Northwest Hub', production: 1178, gasPressure: 2850, nonCompliantHours: 0 },
+    { id: 22, lat: 29.855, lng: -95.514, status: 'Warning', name: 'Cypress Station', production: 789, gasPressure: 2340, nonCompliantHours: 9 },
+    { id: 23, lat: 29.925, lng: -95.620, status: 'Operational', name: 'Willowbrook Unit', production: 1401, gasPressure: 3190, nonCompliantHours: 0 },
 
     // Central Houston area
-    { id: 24, x: 50, y: 50, status: 'Operational', name: 'Downtown Central', production: 1523, gasPressure: 3420, nonCompliantHours: 0 },
-    { id: 25, x: 55, y: 45, status: 'Operational', name: 'Midtown Station', production: 1267, gasPressure: 3100, nonCompliantHours: 0 },
+    { id: 24, lat: 29.760, lng: -95.370, status: 'Operational', name: 'Downtown Central', production: 1523, gasPressure: 3420, nonCompliantHours: 0 },
+    { id: 25, lat: 29.795, lng: -95.323, status: 'Operational', name: 'Midtown Station', production: 1267, gasPressure: 3100, nonCompliantHours: 0 },
   ];
 
   const stats = [
@@ -643,9 +685,9 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
         </div>
 
         {mounted ? (
-          <div className="relative h-96 bg-slate-700 dark:bg-gray-900 rounded-lg overflow-visible">
+          <div className="relative h-96 rounded-lg overflow-hidden">
             {/* Zoom Controls */}
-            <div className="absolute top-4 right-4 z-30 flex flex-col space-y-2">
+            <div className="absolute top-4 right-4 z-[1000] flex flex-col space-y-2">
               <button
                 onClick={handleZoomIn}
                 className="w-10 h-10 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
@@ -669,169 +711,42 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
               </button>
             </div>
 
-            {/* Zoom Level Indicator */}
-            <div className="absolute bottom-4 right-4 z-30 bg-white/90 dark:bg-gray-800/90 rounded-lg px-3 py-1 shadow-md border border-gray-200 dark:border-gray-700">
-              <div className="text-xs font-medium text-gray-900 dark:text-white">
-                Zoom: {Math.round(mapZoom * 100)}%
-              </div>
-            </div>
-
-            {/* Interactive Map Container */}
-            <div
-              className={`absolute inset-0 transition-transform duration-200 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-              style={{
-                transform: `translate(${mapPosition.x}px, ${mapPosition.y}px) scale(${mapZoom})`,
-                transformOrigin: 'center center'
-              }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+            <MapContainer
+              center={houstonCenter}
+              zoom={10}
+              scrollWheelZoom={true}
+              style={{ height: '100%', width: '100%' }}
+              zoomControl={false}
+              ref={mapRef}
             >
-              {/* Map Background Wrapper with Overflow Hidden */}
-              <div className="absolute inset-0 overflow-hidden rounded-lg">
-              {/* Realistic Satellite Map */}
-              <div className="absolute inset-0 bg-gradient-to-br from-gray-600 via-stone-600 to-slate-700 dark:from-gray-800 dark:via-gray-700 dark:to-gray-900">
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
 
-                {/* Natural Terrain Texture */}
-                <div className="absolute inset-0 opacity-50">
-                  {/* Large vegetation patches - darker greens for satellite look */}
-                  <div className="absolute top-[5%] left-[10%] w-20 h-16 bg-green-900 dark:bg-green-950 rounded-full transform rotate-12 opacity-60"></div>
-                  <div className="absolute top-[15%] left-[40%] w-24 h-18 bg-emerald-900 dark:bg-green-950 rounded-full transform -rotate-6 opacity-50"></div>
-                  <div className="absolute top-[25%] right-[20%] w-18 h-14 bg-green-800 dark:bg-green-950 rounded-full transform rotate-45 opacity-55"></div>
-                  <div className="absolute top-[45%] left-[5%] w-22 h-20 bg-teal-900 dark:bg-gray-900 rounded-full transform -rotate-12 opacity-65"></div>
-                  <div className="absolute bottom-[30%] left-[25%] w-16 h-12 bg-green-900 dark:bg-green-950 rounded-full transform rotate-30 opacity-50"></div>
-                  <div className="absolute bottom-[15%] right-[35%] w-20 h-16 bg-emerald-900 dark:bg-gray-900 rounded-full transform -rotate-20 opacity-55"></div>
-
-                  {/* Agricultural fields - brown/tan for realistic satellite view */}
-                  <div className="absolute top-[8%] left-[65%] w-14 h-10 bg-amber-700 dark:bg-amber-900 opacity-60 transform rotate-15"></div>
-                  <div className="absolute top-[35%] right-[15%] w-12 h-8 bg-yellow-700 dark:bg-yellow-900 opacity-55 transform -rotate-10"></div>
-                  <div className="absolute bottom-[40%] left-[70%] w-16 h-12 bg-orange-800 dark:bg-orange-950 opacity-60 transform rotate-25"></div>
-                </div>
-
-                {/* Water Bodies - darker blue for satellite realism */}
-                {/* Galveston Bay */}
-                <div className="absolute bottom-0 right-0 w-40 h-32 bg-blue-700 dark:bg-blue-900 opacity-90">
-                  <div className="absolute inset-2 bg-blue-600 dark:bg-blue-800 opacity-70"></div>
-                  <div className="absolute bottom-2 right-2 w-8 h-6 bg-blue-800 dark:bg-blue-950 opacity-80"></div>
-                </div>
-                <div className="absolute bottom-0 right-24 w-24 h-20 bg-blue-700 dark:bg-blue-900 opacity-85">
-                  <div className="absolute inset-1 bg-blue-600 dark:bg-blue-800 opacity-60"></div>
-                </div>
-
-                {/* Buffalo Bayou */}
-                <div className="absolute top-1/2 left-0 right-0 h-3 bg-blue-800 dark:bg-blue-950 transform -rotate-2 opacity-85">
-                  <div className="absolute inset-0 bg-blue-700 dark:bg-blue-900 opacity-70"></div>
-                </div>
-
-                {/* Ship Channel */}
-                <div className="absolute bottom-8 left-1/2 right-0 h-4 bg-blue-800 dark:bg-blue-950 transform rotate-6 origin-left opacity-85">
-                  <div className="absolute inset-0 bg-blue-700 dark:bg-blue-900 opacity-70"></div>
-                </div>
-
-                {/* Major Highways - Realistic */}
-                {mapZoom > 0.8 && (
-                  <>
-                    {/* I-10 (Katy Freeway) */}
-                    <div className="absolute top-1/2 left-0 right-0 bg-gray-600 dark:bg-gray-400 shadow-md" style={{ height: '2px', transform: 'translateY(-1px)' }}></div>
-
-                    {/* I-45 (Gulf Freeway) */}
-                    <div className="absolute top-0 left-1/2 bottom-0 bg-gray-600 dark:bg-gray-400 transform rotate-12 origin-top shadow-md" style={{ width: '2px' }}></div>
-
-                    {/* US-59/I-69 (Southwest Freeway) */}
-                    <div className="absolute top-0 right-0 bottom-0 bg-gray-600 dark:bg-gray-400 transform -rotate-12 origin-top shadow-md" style={{ width: '2px' }}></div>
-
-                    {/* Beltway 8 */}
-                    <div className="absolute top-1/4 left-1/4 w-48 h-48 border-2 border-gray-600 dark:border-gray-400 rounded-full opacity-70"></div>
-                  </>
-                )}
-
-                {/* Urban Areas */}
-                {/* Downtown Houston */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                  <div className="w-16 h-16 bg-gray-400 dark:bg-gray-600 opacity-80 shadow-lg">
-                    <div className="absolute inset-1 bg-gray-500 dark:bg-gray-700 opacity-70"></div>
-                    <div className="absolute inset-2 bg-gray-600 dark:bg-gray-800 opacity-60"></div>
-                  </div>
-                  {mapZoom > 1.5 && (
-                    <>
-                      <div className="absolute -top-1 -left-2 w-3 h-10 bg-gray-500 dark:bg-gray-600 shadow-md opacity-75"></div>
-                      <div className="absolute -top-1 left-2 w-3 h-8 bg-gray-500 dark:bg-gray-600 shadow-md opacity-75"></div>
-                      <div className="absolute -top-1 left-6 w-3 h-12 bg-gray-500 dark:bg-gray-600 shadow-md opacity-75"></div>
-                      <div className="absolute -top-1 left-10 w-3 h-9 bg-gray-500 dark:bg-gray-600 shadow-md opacity-75"></div>
-                      <div className="absolute -top-1 left-14 w-3 h-11 bg-gray-500 dark:bg-gray-600 shadow-md opacity-75"></div>
-                    </>
-                  )}
-                </div>
-
-                {/* Industrial/Refinery Complex */}
-                <div className="absolute bottom-12 right-12">
-                  <div className="flex space-x-1">
-                    <div className="w-4 h-8 bg-gray-500 dark:bg-gray-600 shadow-lg opacity-80"></div>
-                    <div className="w-4 h-10 bg-gray-500 dark:bg-gray-600 shadow-lg opacity-80"></div>
-                    <div className="w-4 h-6 bg-gray-500 dark:bg-gray-600 shadow-lg opacity-80"></div>
-                  </div>
-                  <div className="mt-1 w-12 h-3 bg-gray-400 dark:bg-gray-500 opacity-60"></div>
-                </div>
-
-                {/* Energy Corridor */}
-                <div className="absolute top-1/2 left-8 transform -translate-y-1/2">
-                  <div className="w-20 h-8 bg-gray-400 dark:bg-gray-600 opacity-75 shadow-md">
-                    <div className="absolute inset-1 bg-gray-500 dark:bg-gray-700 opacity-60"></div>
-                  </div>
-                </div>
-
-                {/* Suburban Areas - earth tones for satellite realism */}
-                <div className="absolute top-1/4 left-1/5 w-14 h-10 bg-stone-700 dark:bg-stone-900 opacity-75 shadow-inner"></div>
-                <div className="absolute top-1/6 right-1/5 w-12 h-8 bg-stone-600 dark:bg-stone-800 opacity-75 shadow-inner"></div>
-                <div className="absolute bottom-1/3 left-1/4 w-16 h-12 bg-amber-800 dark:bg-amber-950 opacity-75 shadow-inner"></div>
-
-                {/* Forest Areas - darker greens for satellite view */}
-                <div className="absolute top-[20%] left-[30%] w-18 h-14 bg-green-900 dark:bg-green-950 opacity-80 rounded-lg shadow-inner"></div>
-                <div className="absolute bottom-[35%] right-[25%] w-14 h-18 bg-emerald-900 dark:bg-green-950 opacity-80 rounded-lg shadow-inner"></div>
-                <div className="absolute top-[60%] left-[15%] w-12 h-10 bg-teal-900 dark:bg-gray-900 opacity-80 rounded-lg shadow-inner"></div>
-
-                {/* Coastal vegetation */}
-                <div className="absolute bottom-[5%] right-[45%] w-8 h-6 bg-green-800 dark:bg-green-950 opacity-70 rounded-full"></div>
-                <div className="absolute bottom-[15%] right-[55%] w-10 h-8 bg-emerald-800 dark:bg-green-950 opacity-70 rounded-full"></div>
-              </div>
-              </div>
-
-            {/* Well Markers */}
-            <div className="absolute inset-0">
+              {/* Well Markers */}
               {wellsData.map((well) => {
-                let color, bgColor;
+                const customIcon = createWellIcon(well.status);
+                if (!customIcon) return null;
 
+                // Determine color for status badge
+                let badgeColor;
                 if (well.status === 'Operational') {
-                  color = 'bg-green-500';
-                  bgColor = 'bg-green-100 dark:bg-green-900/20';
+                  badgeColor = '#10b981';
                 } else if (well.status === 'Warning') {
-                  color = 'bg-yellow-500';
-                  bgColor = 'bg-yellow-100 dark:bg-yellow-900/20';
+                  badgeColor = '#eab308';
                 } else {
-                  color = 'bg-red-500';
-                  bgColor = 'bg-red-100 dark:bg-red-900/20';
+                  badgeColor = '#ef4444';
                 }
 
                 return (
-                  <div
+                  <Marker
                     key={well.id}
-                    className="absolute cursor-pointer transform -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${well.x}%`, top: `${well.y}%`, zIndex: hoveredWell === well.id ? 100 : 10 }}
-                    onMouseEnter={() => setHoveredWell(well.id)}
-                    onMouseLeave={() => setHoveredWell(null)}
+                    position={[well.lat, well.lng]}
+                    icon={customIcon}
                   >
-                    <div className={`w-4 h-4 ${color} rounded-full shadow-lg transition-transform duration-200 border-2 border-white dark:border-gray-800 ${
-                      hoveredWell === well.id ? 'scale-125' : ''
-                    }`}></div>
-
-                    {/* Enhanced Tooltip */}
-                    <div className={`absolute bottom-full mb-2 transition-opacity duration-200 z-50 pointer-events-none ${
-                      hoveredWell === well.id ? 'opacity-100' : 'opacity-0'
-                    } ${
-                      well.x > 70 ? 'right-0' : well.x < 30 ? 'left-0' : 'left-1/2 transform -translate-x-1/2'
-                    }`}>
-                      <div className="bg-white dark:bg-gray-800 rounded-lg px-4 py-3 shadow-xl border border-gray-200 dark:border-gray-600 min-w-[240px]">
+                    <Popup>
+                      <div className="p-2">
                         {/* Header */}
                         <div className="border-b border-gray-200 dark:border-gray-600 pb-2 mb-3">
                           <div className="text-base font-bold text-gray-900 dark:text-white">{well.name}</div>
@@ -840,17 +755,17 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
 
                         {/* Data Rows */}
                         <div className="space-y-2">
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-center gap-4">
                             <span className="text-sm text-gray-600 dark:text-gray-400">Production:</span>
                             <span className="text-sm font-semibold text-gray-900 dark:text-white">{well.production.toLocaleString()} BBL/day</span>
                           </div>
 
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-center gap-4">
                             <span className="text-sm text-gray-600 dark:text-gray-400">Gas Pressure:</span>
                             <span className="text-sm font-semibold text-gray-900 dark:text-white">{well.gasPressure.toLocaleString()} PSI</span>
                           </div>
 
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-center gap-4">
                             <span className="text-sm text-gray-600 dark:text-gray-400">Compliance:</span>
                             <span className={`text-sm font-semibold ${
                               well.status === 'Critical' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
@@ -859,7 +774,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
                             </span>
                           </div>
 
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-center gap-4">
                             <span className="text-sm text-gray-600 dark:text-gray-400">Non-Compliant Hours:</span>
                             <span className={`text-sm font-semibold ${
                               well.nonCompliantHours === 0 ? 'text-green-600 dark:text-green-400' :
@@ -878,25 +793,18 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
                             well.status === 'Warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
                             'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
                           }`}>
-                            <div className={`w-2 h-2 rounded-full mr-1 ${color.replace('bg-', 'bg-')}`}></div>
+                            <div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: badgeColor }}></div>
                             {well.status === 'Operational' ? 'Normal Operations' :
                              well.status === 'Warning' ? 'Requires Attention' :
                              'Immediate Action Required'}
                           </div>
                         </div>
-
-                        {/* Arrow */}
-                        <div className={`absolute top-full w-0 h-0 border-l-[8px] border-r-[8px] border-t-[8px] border-l-transparent border-r-transparent border-t-white dark:border-t-gray-800 ${
-                          well.x > 70 ? 'right-4' : well.x < 30 ? 'left-4' : 'left-1/2 transform -translate-x-1/2'
-                        }`}></div>
                       </div>
-                    </div>
-                  </div>
+                    </Popup>
+                  </Marker>
                 );
               })}
-            </div>
-
-            </div>
+            </MapContainer>
           </div>
         ) : (
           <div className="h-96 flex items-center justify-center bg-gray-50 dark:bg-gray-700/50 rounded-lg">

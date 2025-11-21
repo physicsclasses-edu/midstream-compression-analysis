@@ -2,7 +2,7 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea, ReferenceLine } from 'recharts';
 import { useState, useEffect, useRef } from 'react';
-import { Maximize2, Minimize2, ChevronLeft, ChevronRight, ChevronDown, Settings, RotateCcw } from 'lucide-react';
+import { Maximize2, Minimize2, ChevronLeft, ChevronRight, ChevronDown, Settings, RotateCcw, ArrowLeft } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 interface TimeSeriesChartProps {
@@ -11,6 +11,15 @@ interface TimeSeriesChartProps {
   onWellChange?: (well: string) => void;
   metrics: string[];
   dateRange: { from: string; to: string };
+  // Multi-select props
+  mode?: 'single' | 'multi';
+  selectedWells?: string[];
+  availableWells?: string[];
+  onModeChange?: (mode: 'single' | 'multi') => void;
+  onSelectedWellsChange?: (wells: string[]) => void;
+  // Multi-well analysis props
+  onBackToMap?: () => void;
+  isMultiWellAnalysis?: boolean;
 }
 
 // Define phases with timestamps (in hours from start)
@@ -255,7 +264,20 @@ const generateTimeSeriesData = (metrics: string[], well: string, dateRange: { fr
   return data;
 };
 
-export default function TimeSeriesChart({ well, wells, onWellChange, metrics, dateRange }: TimeSeriesChartProps) {
+export default function TimeSeriesChart({
+  well,
+  wells,
+  onWellChange,
+  metrics,
+  dateRange,
+  mode = 'single',
+  selectedWells = [],
+  availableWells = [],
+  onModeChange,
+  onSelectedWellsChange,
+  onBackToMap,
+  isMultiWellAnalysis = false
+}: TimeSeriesChartProps) {
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -546,47 +568,122 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
         {/* Top row: Title/Well and Buttons */}
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-3">
+            {/* Back button for multi-well analysis */}
+            {isMultiWellAnalysis && onBackToMap && (
+              <button
+                onClick={onBackToMap}
+                className="p-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                title="Back to Map"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+              </button>
+            )}
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">
               Time-Series Analysis:
             </h3>
-            {wells && wells.length > 0 && onWellChange && (
-              <div className="relative" ref={wellDropdownRef}>
-                <button
-                  onClick={() => setIsWellDropdownOpen(!isWellDropdownOpen)}
-                  className="px-4 py-2 text-base font-semibold bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
-                >
-                  {well}
-                  <ChevronDown className={`w-4 h-4 transition-transform ${isWellDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
 
-                {isWellDropdownOpen && (
-                  <div className="absolute z-30 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-60 overflow-auto min-w-[200px]">
-                    {wells.map((wellOption, index) => (
-                      <button
-                        key={wellOption}
-                        onClick={() => {
-                          onWellChange(wellOption);
-                          setIsWellDropdownOpen(false);
-                        }}
-                        className={`w-full px-4 py-2.5 text-left transition-colors ${
-                          index === 0 ? 'rounded-t-lg' : ''
-                        } ${
-                          index === wells.length - 1 ? 'rounded-b-lg' : ''
-                        } ${
-                          well === wellOption
-                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {wellOption}
-                        {well === wellOption && (
-                          <span className="ml-2 text-blue-500 dark:text-blue-400">✓</span>
-                        )}
-                      </button>
-                    ))}
+            {wells && wells.length > 0 && (
+              <>
+                {/* Single Well Dropdown */}
+                {mode === 'single' && onWellChange && (
+                  <div className="relative" ref={wellDropdownRef}>
+                    <button
+                      onClick={() => setIsWellDropdownOpen(!isWellDropdownOpen)}
+                      className="px-4 py-2 text-base font-semibold bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+                    >
+                      {well}
+                      <ChevronDown className={`w-4 h-4 transition-transform ${isWellDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isWellDropdownOpen && (
+                      <div className="absolute z-30 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-60 overflow-auto min-w-[200px]">
+                        {wells.map((wellOption, index) => (
+                          <button
+                            key={wellOption}
+                            onClick={() => {
+                              onWellChange(wellOption);
+                              setIsWellDropdownOpen(false);
+                            }}
+                            className={`w-full px-4 py-2.5 text-left transition-colors ${
+                              index === 0 ? 'rounded-t-lg' : ''
+                            } ${
+                              index === wells.length - 1 ? 'rounded-b-lg' : ''
+                            } ${
+                              well === wellOption
+                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            {wellOption}
+                            {well === wellOption && (
+                              <span className="ml-2 text-blue-500 dark:text-blue-400">✓</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+
+                {/* Multi-Well Dropdown (for isMultiWellAnalysis) */}
+                {isMultiWellAnalysis && onSelectedWellsChange && (
+                  <div className="relative" ref={wellDropdownRef}>
+                    <button
+                      onClick={() => setIsWellDropdownOpen(!isWellDropdownOpen)}
+                      className="px-4 py-2 text-base font-semibold bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+                    >
+                      {selectedWells.length > 0 ? `${selectedWells.length} Wells Selected` : 'Select Wells'}
+                      <ChevronDown className={`w-4 h-4 transition-transform ${isWellDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isWellDropdownOpen && (
+                      <div className="absolute z-30 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-60 overflow-auto min-w-[250px]">
+                        {availableWells.map((wellOption, index) => {
+                          const isSelected = selectedWells.includes(wellOption);
+                          return (
+                            <button
+                              key={wellOption}
+                              onClick={() => {
+                                if (isSelected) {
+                                  // Deselect well - but keep at least one well selected
+                                  if (selectedWells.length > 1) {
+                                    onSelectedWellsChange(selectedWells.filter(w => w !== wellOption));
+                                  }
+                                } else {
+                                  // Select well
+                                  onSelectedWellsChange([...selectedWells, wellOption]);
+                                }
+                              }}
+                              className={`w-full px-4 py-2.5 text-left transition-colors flex items-center gap-2 ${
+                                index === 0 ? 'rounded-t-lg' : ''
+                              } ${
+                                index === availableWells.length - 1 ? 'rounded-b-lg' : ''
+                              } ${
+                                isSelected
+                                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold'
+                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                              }`}
+                            >
+                              <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
+                                isSelected
+                                  ? 'bg-blue-600 border-blue-600'
+                                  : 'border-gray-300 dark:border-gray-600'
+                              }`}>
+                                {isSelected && (
+                                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                                  </svg>
+                                )}
+                              </div>
+                              <span className="flex-1">{wellOption}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -755,20 +852,22 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
             Showing {Object.values(visibleMetrics).filter(v => v).length} metric{Object.values(visibleMetrics).filter(v => v).length > 1 ? 's' : ''} over {totalDays} days with phase transitions • <span className="italic">(Shift+Scroll to zoom • Drag to pan)</span>
           </p>
           {/* Phase Legend - Right aligned */}
-          <div className="flex items-center gap-3 text-sm whitespace-nowrap">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-[#bbf7d0] dark:bg-[#34d399] dark:opacity-25"></div>
-              <span className="text-gray-700 dark:text-gray-300">Natural Flow</span>
+          {!isMultiWellAnalysis && (
+            <div className="flex items-center gap-3 text-sm whitespace-nowrap">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-[#bbf7d0] dark:bg-[#34d399] dark:opacity-25"></div>
+                <span className="text-gray-700 dark:text-gray-300">Natural Flow</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-[#fee2e2] dark:bg-[#f87171] dark:opacity-25"></div>
+                <span className="text-gray-700 dark:text-gray-300">Shut-in</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-[#dbeafe] dark:bg-[#60a5fa] dark:opacity-25"></div>
+                <span className="text-gray-700 dark:text-gray-300">Continuous Gas Lift</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-[#fee2e2] dark:bg-[#f87171] dark:opacity-25"></div>
-              <span className="text-gray-700 dark:text-gray-300">Shut-in</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-[#dbeafe] dark:bg-[#60a5fa] dark:opacity-25"></div>
-              <span className="text-gray-700 dark:text-gray-300">Continuous Gas Lift</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -862,7 +961,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
               const shutin2End = 10 * 24; // Days 7-9 (8/19-8/21) - overlap into day 10
               const continuousStart = 10 * 24; // Day 10+ (8/22+)
 
-              return (
+              return !isMultiWellAnalysis ? (
                 <>
                   {/* Natural Flow Phase 1: Days 0-2 (8/12-8/14) - Green background */}
                   {natural1End >= firstVisibleIndex && natural1Start <= lastVisibleIndex && (
@@ -924,7 +1023,7 @@ export default function TimeSeriesChart({ well, wells, onWellChange, metrics, da
                     />
                   )}
                 </>
-              );
+              ) : null;
             })()}
 
             {/* Threshold Lines */}

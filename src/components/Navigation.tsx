@@ -84,9 +84,9 @@ export default function Navigation({ activeTab, onTabChange, onDateRangeChange }
                     className={`flex items-center space-x-2 pt-3 pb-2 px-4 text-base border-b-[3px] transition-all duration-150 tab-button ${
                       isActive ? 'tab-active' : 'tab-inactive'
                     }`}
-                    style={{ paddingBottom: '0.5rem' }}
+                    style={{ paddingBottom: '0.5rem', lineHeight: '24px' }}
                   >
-                    <Icon size={18} style={{ verticalAlign: 'middle', display: 'inline-block' }} />
+                    <Icon size={18} style={{ verticalAlign: 'middle', display: 'inline-block', marginBottom: '2px' }} />
                     <span style={{ verticalAlign: 'middle', display: 'inline-block' }}>{tab.label}</span>
                   </button>
                 );
@@ -99,15 +99,16 @@ export default function Navigation({ activeTab, onTabChange, onDateRangeChange }
                   <button
                     onClick={() => setIsCalendarOpen(!isCalendarOpen)}
                     className="flex items-center space-x-2 bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ lineHeight: '20px' }}
                   >
-                    <Calendar size={16} className="text-gray-600 dark:text-gray-400" style={{ verticalAlign: 'middle', display: 'inline-block' }} />
+                    <Calendar size={16} className="text-gray-600 dark:text-gray-400" style={{ verticalAlign: 'middle', display: 'inline-block', marginBottom: '2px' }} />
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300" style={{ verticalAlign: 'middle', display: 'inline-block' }}>
                       {formatDateRange()}
                     </span>
                     <ChevronDown
                       size={14}
                       className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`}
-                      style={{ verticalAlign: 'middle', display: 'inline-block' }}
+                      style={{ verticalAlign: 'middle', display: 'inline-block', marginBottom: '2px' }}
                     />
                   </button>
 
