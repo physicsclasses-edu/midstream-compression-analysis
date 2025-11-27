@@ -92,6 +92,7 @@ export default function OilImpactContent({ dateRange }: OilImpactContentProps) {
     'Water Production Rate',
     'Gas Production Rate',
     'Predicted Oil Production Rate',
+    'Predicted Oil Production Rate (BTE)',
   ];
 
   return (

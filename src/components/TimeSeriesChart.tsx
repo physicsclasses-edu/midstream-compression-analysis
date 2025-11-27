@@ -36,7 +36,7 @@ const RIGHT_AXIS_METRICS = ['Gas Injection Pressure', 'Gas Injection Rate', 'Cas
 // Base color palette for different metrics
 const BASE_METRIC_COLORS: string[] = [
   "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
-  "#EDC949", "#AF7AA1", "#FF9DA7", "#9C755F", "#BAB0AC"
+  "#EDC949", "#AF7AA1", "#FF9DA7", "#9C755F", "#BAB0AC", "#64748B"
 ];
 
 // Mapping of metrics to colors
@@ -51,6 +51,7 @@ const METRIC_COLOR_MAP: { [key: string]: number } = {
   'Water Production Rate': 7,
   'Gas Production Rate': 8,
   'Predicted Oil Production Rate': 9,
+  'Predicted Oil Production Rate (BTE)': 10,
 };
 
 // Utility function to adjust color brightness
@@ -162,6 +163,7 @@ const generateTimeSeriesData = (metrics: string[], well: string, dateRange: { fr
     'Water Production Rate': { base: 85, unit: 'BBL/day', variance: 15 },
     'Gas Production Rate': { base: 3.2, unit: 'MMscf/d', variance: 0.4 },
     'Predicted Oil Production Rate': { base: 145, unit: 'BBL/day', variance: 12 },
+    'Predicted Oil Production Rate (BTE)': { base: 145, unit: 'BBL/day', variance: 12 },
   };
 
   // Store oil production values for prediction matching
@@ -220,8 +222,8 @@ const generateTimeSeriesData = (metrics: string[], well: string, dateRange: { fr
         const config = metricBases[metric] || { base: 100, unit: '', variance: 10 };
         let value = config.base;
 
-        // Special handling for Predicted Oil Production Rate
-        if (metric === 'Predicted Oil Production Rate') {
+        // Special handling for Predicted Oil Production Rate metrics
+        if (metric === 'Predicted Oil Production Rate' || metric === 'Predicted Oil Production Rate (BTE)') {
           const actualValue = oilProductionValues[hourKey];
           if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
             value = 0;
@@ -247,7 +249,7 @@ const generateTimeSeriesData = (metrics: string[], well: string, dateRange: { fr
             const variance = (seededRandom((day * 24 + hour) * 1000 + metricIndex * 100) - 0.5) * config.variance;
             value += variance;
 
-            if (metric.includes('Production Rate') && metric !== 'Predicted Oil Production Rate' && day >= 9) {
+            if (metric.includes('Production Rate') && metric !== 'Predicted Oil Production Rate' && metric !== 'Predicted Oil Production Rate (BTE)' && day >= 9) {
               const boostFactor = metric.includes('Oil') ? 1.12 : 1.08;
               value *= boostFactor;
             }

@@ -18,8 +18,8 @@ const Marker = dynamic(
   () => import('react-leaflet').then((mod) => mod.Marker),
   { ssr: false }
 );
-const Popup = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Popup),
+const Tooltip = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Tooltip),
   { ssr: false }
 );
 
@@ -659,6 +659,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
       {/* Houston Region Well Status Map */}
       <div
         className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700"
+        style={{ overflow: 'visible' }}
         onMouseLeave={() => setHoveredWell(null)}
       >
         <div className="flex items-center justify-between mb-6">
@@ -685,7 +686,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
         </div>
 
         {mounted ? (
-          <div className="relative h-96 rounded-lg overflow-hidden">
+          <div className="relative h-96" style={{ overflow: 'visible' }}>
             {/* Zoom Controls */}
             <div className="absolute top-4 right-4 z-[1000] flex flex-col space-y-2">
               <button
@@ -711,14 +712,15 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
               </button>
             </div>
 
-            <MapContainer
-              center={houstonCenter}
-              zoom={10}
-              scrollWheelZoom={true}
-              style={{ height: '100%', width: '100%' }}
-              zoomControl={false}
-              ref={mapRef}
-            >
+            <div style={{ borderRadius: '0.5rem', overflow: 'hidden', height: '100%', width: '100%' }}>
+              <MapContainer
+                center={houstonCenter}
+                zoom={10}
+                scrollWheelZoom={true}
+                style={{ height: '100%', width: '100%' }}
+                zoomControl={false}
+                ref={mapRef}
+              >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -745,7 +747,13 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
                     position={[well.lat, well.lng]}
                     icon={customIcon}
                   >
-                    <Popup>
+                    <Tooltip
+                      direction="auto"
+                      offset={[0, -10]}
+                      opacity={0.95}
+                      permanent={false}
+                      sticky={true}
+                    >
                       <div className="p-2">
                         {/* Header */}
                         <div className="border-b border-gray-200 dark:border-gray-600 pb-2 mb-3">
@@ -800,11 +808,12 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
                           </div>
                         </div>
                       </div>
-                    </Popup>
+                    </Tooltip>
                   </Marker>
                 );
               })}
             </MapContainer>
+            </div>
           </div>
         ) : (
           <div className="h-96 flex items-center justify-center bg-gray-50 dark:bg-gray-700/50 rounded-lg">
@@ -920,6 +929,29 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
         [style*="backgroundColor: #9CC2F9"]:hover,
         [style*="backgroundColor: #C6DEFF"]:hover {
           filter: brightness(1.15);
+        }
+
+        /* Leaflet tooltip positioning to show above card boundaries */
+        .leaflet-tooltip-pane {
+          z-index: 9999 !important;
+        }
+
+        .leaflet-tooltip {
+          z-index: 9999 !important;
+          pointer-events: auto !important;
+        }
+
+        .leaflet-container {
+          overflow: visible !important;
+        }
+
+        .leaflet-pane {
+          z-index: auto;
+        }
+
+        .leaflet-top,
+        .leaflet-bottom {
+          z-index: 1000;
         }
       `}</style>
     </div>
