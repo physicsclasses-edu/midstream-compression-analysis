@@ -753,55 +753,59 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
                       opacity={0.95}
                       permanent={false}
                       sticky={true}
+                      className="well-info-tooltip"
                     >
-                      <div className="p-2">
+                      <div className="well-tooltip-content">
                         {/* Header */}
-                        <div className="border-b border-gray-200 dark:border-gray-600 pb-2 mb-3">
-                          <div className="text-base font-bold text-gray-900 dark:text-white">{well.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Well #{String(well.id).padStart(3, '0')}</div>
+                        <div className="well-tooltip-header">
+                          <div className="well-tooltip-name">{well.name}</div>
+                          <div className="well-tooltip-id">Well #{String(well.id).padStart(3, '0')}</div>
                         </div>
 
                         {/* Data Rows */}
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center gap-4">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Production:</span>
-                            <span className="text-sm font-semibold text-gray-900 dark:text-white">{well.production.toLocaleString()} BBL/day</span>
+                        <div className="well-tooltip-data">
+                          <div className="well-tooltip-row">
+                            <span className="well-tooltip-label">Production:</span>
+                            <span className="well-tooltip-value">{well.production.toLocaleString()} BBL/day</span>
                           </div>
 
-                          <div className="flex justify-between items-center gap-4">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Gas Pressure:</span>
-                            <span className="text-sm font-semibold text-gray-900 dark:text-white">{well.gasPressure.toLocaleString()} PSI</span>
+                          <div className="well-tooltip-row">
+                            <span className="well-tooltip-label">Gas Pressure:</span>
+                            <span className="well-tooltip-value">{well.gasPressure.toLocaleString()} PSI</span>
                           </div>
 
-                          <div className="flex justify-between items-center gap-4">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Compliance:</span>
-                            <span className={`text-sm font-semibold ${
-                              well.status === 'Critical' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                            }`}>
+                          <div className="well-tooltip-row">
+                            <span className="well-tooltip-label">Compliance:</span>
+                            <span className="well-tooltip-value" style={{
+                              color: well.status === 'Critical' ? '#ef4444' : '#10b981'
+                            }}>
                               {well.status === 'Critical' ? 'Non-Compliant' : 'Compliant'}
                             </span>
                           </div>
 
-                          <div className="flex justify-between items-center gap-4">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Non-Compliant Hours:</span>
-                            <span className={`text-sm font-semibold ${
-                              well.nonCompliantHours === 0 ? 'text-green-600 dark:text-green-400' :
-                              well.nonCompliantHours < 50 ? 'text-orange-600 dark:text-orange-400' :
-                              'text-red-600 dark:text-red-400'
-                            }`}>
+                          <div className="well-tooltip-row">
+                            <span className="well-tooltip-label">Non-Compliant Hours:</span>
+                            <span className="well-tooltip-value" style={{
+                              color: well.nonCompliantHours === 0 ? '#10b981' :
+                                     well.nonCompliantHours < 50 ? '#f97316' :
+                                     '#ef4444'
+                            }}>
                               {well.nonCompliantHours}h
                             </span>
                           </div>
                         </div>
 
                         {/* Status Badge */}
-                        <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-600">
-                          <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            well.status === 'Operational' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
-                            well.status === 'Warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
-                            'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                          }`}>
-                            <div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: badgeColor }}></div>
+                        <div className="well-tooltip-footer">
+                          <div className="well-tooltip-badge" style={{
+                            backgroundColor: well.status === 'Operational' ? '#dcfce7' :
+                                           well.status === 'Warning' ? '#fef3c7' :
+                                           '#fee2e2',
+                            color: well.status === 'Operational' ? '#166534' :
+                                  well.status === 'Warning' ? '#854d0e' :
+                                  '#991b1b'
+                          }}>
+                            <div className="well-tooltip-badge-dot" style={{ backgroundColor: badgeColor }}></div>
                             {well.status === 'Operational' ? 'Normal Operations' :
                              well.status === 'Warning' ? 'Requires Attention' :
                              'Immediate Action Required'}
@@ -952,6 +956,76 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
         .leaflet-top,
         .leaflet-bottom {
           z-index: 1000;
+        }
+
+        /* Well Tooltip Styles */
+        .well-tooltip-content {
+          padding: 8px;
+          min-width: 240px;
+        }
+
+        .well-tooltip-header {
+          border-bottom: 1px solid #e5e7eb;
+          padding-bottom: 8px;
+          margin-bottom: 12px;
+        }
+
+        .well-tooltip-name {
+          font-size: 16px;
+          font-weight: bold;
+          color: #111827;
+          margin-bottom: 4px;
+        }
+
+        .well-tooltip-id {
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .well-tooltip-data {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .well-tooltip-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .well-tooltip-label {
+          font-size: 14px;
+          color: #4b5563;
+        }
+
+        .well-tooltip-value {
+          font-size: 14px;
+          font-weight: 600;
+          color: #111827;
+        }
+
+        .well-tooltip-footer {
+          margin-top: 12px;
+          padding-top: 8px;
+          border-top: 1px solid #e5e7eb;
+        }
+
+        .well-tooltip-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 8px;
+          border-radius: 9999px;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .well-tooltip-badge-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          margin-right: 4px;
         }
       `}</style>
     </div>
