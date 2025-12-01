@@ -54,14 +54,14 @@ const METRIC_COLOR_MAP: { [key: string]: number } = {
   'Predicted Oil Production Rate (BTE)': 10,
 };
 
-// Utility function to adjust color brightness
+// Utility function to adjust color brightness and vibrancy
 const adjustColorBrightness = (color: string, isDark: boolean): string => {
   const hex = color.replace('#', '');
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
 
-  const factor = isDark ? 1.10 : 1.0; // Lighten by 10% in dark mode
+  const factor = isDark ? 1.15 : 1.05; // More vibrant in both modes
 
   const adjustChannel = (channel: number) => {
     const adjusted = Math.round(channel * factor);
@@ -153,8 +153,8 @@ const generateTimeSeriesData = (metrics: string[], well: string, dateRange: { fr
 
   // Base values for different metrics
   const metricBases: { [key: string]: { base: number, unit: string, variance: number } } = {
-    'Line Pressure': { base: 850, unit: 'psi', variance: 50 },
-    'Gas Injection Pressure': { base: 1200, unit: 'psi', variance: 100 },
+    'Line Pressure': { base: 155, unit: 'psi', variance: 30 },
+    'Gas Injection Pressure': { base: 950, unit: 'psi', variance: 150 },
     'Gas Injection Rate': { base: 2.5, unit: 'MMscf/d', variance: 0.5 },
     'Choke': { base: 45, unit: '%', variance: 10 },
     'Casing Pressure': { base: 950, unit: 'psi', variance: 60 },
@@ -250,13 +250,40 @@ const generateTimeSeriesData = (metrics: string[], well: string, dateRange: { fr
           if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
             value = 0;
           } else {
-            if (day < 7) {
-              const declineRate = 0.02;
-              value = config.base * (1 - declineRate * (day + hour / 24));
-            } else if (day >= 9) {
-              const daysInContinuous = day - 9 + hour / 24;
-              const improvementFactor = 1.15;
-              value = config.base * improvementFactor * (1 - 0.007 * daysInContinuous);
+            // Special handling for Line Pressure to avoid constant decline
+            if (metric === 'Line Pressure') {
+              if (day < 7) {
+                // Slight decline in natural phase
+                const declineRate = 0.015;
+                value = config.base * (1 - declineRate * (day + hour / 24));
+              } else if (day >= 9) {
+                // Stable with slight improvement in continuous phase
+                const daysInContinuous = day - 9 + hour / 24;
+                const improvementFactor = 1.1;
+                value = config.base * improvementFactor * (1 - 0.002 * daysInContinuous); // Much slower decline
+              }
+            } else if (metric === 'Gas Injection Pressure') {
+              // Special handling for Gas Injection Pressure to avoid constant decline
+              if (day < 7) {
+                // Slight decline in natural phase
+                const declineRate = 0.015;
+                value = config.base * (1 - declineRate * (day + hour / 24));
+              } else if (day >= 9) {
+                // Stable with slight improvement in continuous phase
+                const daysInContinuous = day - 9 + hour / 24;
+                const improvementFactor = 1.12;
+                value = config.base * improvementFactor * (1 - 0.003 * daysInContinuous); // Much slower decline
+              }
+            } else {
+              // Regular behavior for other metrics
+              if (day < 7) {
+                const declineRate = 0.02;
+                value = config.base * (1 - declineRate * (day + hour / 24));
+              } else if (day >= 9) {
+                const daysInContinuous = day - 9 + hour / 24;
+                const improvementFactor = 1.15;
+                value = config.base * improvementFactor * (1 - 0.007 * daysInContinuous);
+              }
             }
 
             const metricIndex = Object.keys(metricBases).indexOf(metric);
@@ -270,7 +297,23 @@ const generateTimeSeriesData = (metrics: string[], well: string, dateRange: { fr
           }
         }
 
-        dataPoint[metric] = Math.max(0, Number(value.toFixed(2)));
+        // Apply minimum and maximum constraints for specific metrics
+        let minValue = 0;
+        let maxValue = Infinity;
+
+        // Line Pressure: 100-200 (except shut-in = 0)
+        if (metric === 'Line Pressure' && value > 0) {
+          minValue = 100;
+          maxValue = 200;
+        }
+
+        // Gas Injection Pressure: 700-1200 (except shut-in = 0)
+        if (metric === 'Gas Injection Pressure' && value > 0) {
+          minValue = 700;
+          maxValue = 1200;
+        }
+
+        dataPoint[metric] = Math.min(maxValue, Math.max(minValue, Number(value.toFixed(2))));
       });
 
       data.push(dataPoint);
@@ -338,7 +381,7 @@ export default function TimeSeriesChart({
     tickTextSize: 11,
     axisLineWidth: 1,
     gridOpacity: 0.2,
-    chartLineWidth: 2,
+    chartLineWidth: 2.5,
     legendSize: 14,
     legendPosition: 'center' as 'left' | 'center' | 'right',
   };
@@ -374,9 +417,12 @@ export default function TimeSeriesChart({
     const isDark = resolvedTheme === 'dark' || theme === 'dark';
     let adjustedColor = adjustColorBrightness(baseColor, isDark);
 
-    // Increase saturation on hover
+    // Increase base saturation for all lines to make them more vibrant
+    adjustedColor = increaseSaturation(adjustedColor, 25);
+
+    // Increase saturation even more on hover
     if (isHovered) {
-      adjustedColor = increaseSaturation(adjustedColor, 10);
+      adjustedColor = increaseSaturation(adjustedColor, 15);
     }
 
     return adjustedColor;
@@ -944,8 +990,8 @@ export default function TimeSeriesChart({
           >
             <defs>
               <filter id="whiteGlow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
-                <feFlood floodColor="#FFFFFF" floodOpacity="0.5" result="glowColor" />
+                <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+                <feFlood floodColor="#FFFFFF" floodOpacity="0.8" result="glowColor" />
                 <feComposite in="glowColor" in2="blur" operator="in" result="softGlow" />
                 <feMerge>
                   <feMergeNode in="softGlow" />
@@ -1131,9 +1177,9 @@ export default function TimeSeriesChart({
             {metrics.filter(metric => visibleMetrics[metric]).map((metric) => {
               const isRightAxis = RIGHT_AXIS_METRICS.includes(metric);
               const isHovered = hoveredMetric === metric;
-              const baseOpacity = 0.85;
-              const opacity = hoveredMetric === null ? baseOpacity : isHovered ? 1 : 0.2;
-              const strokeWidth = isHovered ? chartStyles.chartLineWidth + 1 : chartStyles.chartLineWidth;
+              const baseOpacity = 1.0; // Full opacity for vibrant lines
+              const opacity = hoveredMetric === null ? baseOpacity : isHovered ? 1 : 0.25;
+              const strokeWidth = isHovered ? chartStyles.chartLineWidth + 1.5 : chartStyles.chartLineWidth;
               const strokeColor = getMetricColor(metric, isHovered);
 
               return (
@@ -1258,8 +1304,8 @@ export default function TimeSeriesChart({
                   x2="5"
                   y2="5"
                   stroke={color}
-                  strokeWidth={isHovered && isVisible ? "2.5" : "2"}
-                  opacity={isVisible ? 0.85 : 0.3}
+                  strokeWidth={isHovered && isVisible ? "3" : "2.5"}
+                  opacity={isVisible ? 1.0 : 0.3}
                 />
                 {/* Center hollow circle */}
                 <circle
@@ -1268,8 +1314,8 @@ export default function TimeSeriesChart({
                   r="3"
                   fill="none"
                   stroke={color}
-                  strokeWidth={isHovered && isVisible ? "2.5" : "2"}
-                  opacity={isVisible ? 0.85 : 0.3}
+                  strokeWidth={isHovered && isVisible ? "3" : "2.5"}
+                  opacity={isVisible ? 1.0 : 0.3}
                 />
                 {/* Right line */}
                 <line
@@ -1278,8 +1324,8 @@ export default function TimeSeriesChart({
                   x2="18"
                   y2="5"
                   stroke={color}
-                  strokeWidth={isHovered && isVisible ? "2.5" : "2"}
-                  opacity={isVisible ? 0.85 : 0.3}
+                  strokeWidth={isHovered && isVisible ? "3" : "2.5"}
+                  opacity={isVisible ? 1.0 : 0.3}
                 />
               </svg>
               <span
