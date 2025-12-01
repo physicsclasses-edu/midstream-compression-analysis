@@ -1,7 +1,7 @@
 'use client';
 
 import { TrendingDown, AlertTriangle, TrendingUp, ChevronDown, ZoomIn, ZoomOut, Move, MapPin, BarChart3 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import type { Map as LeafletMap } from 'leaflet';
 
@@ -34,7 +34,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
   const [hoveredMonth, setHoveredMonth] = useState<number | null>(null);
   const [hoveredWell, setHoveredWell] = useState<number | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
-  const houstonCenter: [number, number] = [29.7604, -95.3698];
+  const houstonCenter: [number, number] = [29.435, -97.31]; // Centered on actual well locations
 
   // Helper function to create well icon
   const createWellIcon = (status: string) => {
@@ -91,7 +91,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
 
   const resetMapView = () => {
     if (mapRef.current) {
-      mapRef.current.setView(houstonCenter, 10);
+      mapRef.current.setView(houstonCenter, 13);
     }
   };
 
@@ -171,48 +171,81 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
     return `${fromYear}-${toYear}`;
   };
 
-  // Static well positions and statuses based on Houston geography
-  // Wells positioned using actual Houston lat/lng coordinates
-  const wellsData = [
-    // Ship Channel area wells (Southeast Houston)
-    { id: 1, lat: 29.685, lng: -95.055, status: 'Operational', name: 'Ship Channel Alpha', production: 1247, gasPressure: 2850, nonCompliantHours: 0 },
-    { id: 2, lat: 29.650, lng: -94.980, status: 'Operational', name: 'Bayport Station', production: 982, gasPressure: 2920, nonCompliantHours: 0 },
-    { id: 3, lat: 29.615, lng: -94.920, status: 'Warning', name: 'Gulf Coast Unit', production: 756, gasPressure: 2650, nonCompliantHours: 14 },
-    { id: 4, lat: 29.736, lng: -94.965, status: 'Operational', name: 'Channel View', production: 1156, gasPressure: 2780, nonCompliantHours: 0 },
-    { id: 5, lat: 29.656, lng: -95.020, status: 'Critical', name: 'Refinery Junction', production: 423, gasPressure: 2180, nonCompliantHours: 67 },
+  // Actual well data with real coordinates - use useMemo to prevent hydration issues
+  const wellsData = useMemo(() => {
+    // Simple seeded random function based on well ID for deterministic values
+    const seededRandom = (seed: number, min: number, max: number) => {
+      const x = Math.sin(seed) * 10000;
+      const random = x - Math.floor(x);
+      return Math.floor(min + random * (max - min));
+    };
 
-    // Energy Corridor and West Houston wells
-    { id: 6, lat: 29.785, lng: -95.665, status: 'Operational', name: 'Energy Plaza', production: 1345, gasPressure: 3120, nonCompliantHours: 0 },
-    { id: 7, lat: 29.750, lng: -95.600, status: 'Operational', name: 'Westchase Hub', production: 1189, gasPressure: 2890, nonCompliantHours: 0 },
-    { id: 8, lat: 29.806, lng: -95.550, status: 'Warning', name: 'Katy Freeway Unit', production: 834, gasPressure: 2420, nonCompliantHours: 18 },
-    { id: 9, lat: 29.715, lng: -95.625, status: 'Operational', name: 'Memorial Station', production: 1067, gasPressure: 2950, nonCompliantHours: 0 },
+    return [
+      { id: 1, lat: 29.459734, lng: -97.303643, name: 'Cinco J Ranch LTD #1H' },
+      { id: 2, lat: 29.459802, lng: -97.303466, name: 'Cinco J Ranch LTD #2H' },
+      { id: 3, lat: 29.459765, lng: -97.303489, name: 'Garnet 1H' },
+      { id: 4, lat: 29.447887, lng: -97.296519, name: 'L & J Lee #1H' },
+      { id: 5, lat: 29.447925, lng: -97.296502, name: 'L & J Lee #2H' },
+      { id: 6, lat: 29.450001, lng: -97.295796, name: 'L & J Lee #4H' },
+      { id: 7, lat: 29.450052, lng: -97.295774, name: 'L & J Lee #5H' },
+      { id: 8, lat: 29.450103, lng: -97.295751, name: 'L & J Lee #6H' },
+      { id: 9, lat: 29.459729, lng: -97.30351, name: 'L & Lee Unit 7H' },
+      { id: 10, lat: 29.437156, lng: -97.315931, name: 'Rock Creek Ranch #1H' },
+      { id: 11, lat: 29.437179, lng: -97.315889, name: 'Rock Creek Ranch #2H' },
+      { id: 12, lat: 29.437523, lng: -97.316163, name: 'Rock Creek Ranch #3H' },
+      { id: 13, lat: 29.437542, lng: -97.316119, name: 'Rock Creek Ranch #4H' },
+      { id: 14, lat: 29.437905, lng: -97.308892, name: 'Rock Creek Ranch #5H' },
+      { id: 15, lat: 29.437926, lng: -97.308848, name: 'Rock Creek Ranch #6H' },
+      { id: 16, lat: 29.438265, lng: -97.309122, name: 'Rock Creek Ranch #7H' },
+      { id: 17, lat: 29.438049, lng: -97.30881, name: 'Rock Creek Ranch #8H' },
+      { id: 18, lat: 29.442132, lng: -97.324619, name: 'Rock Creek Ranch #9H' },
+      { id: 19, lat: 29.442381, lng: -97.32493, name: 'Rock Creek Ranch #10H' },
+      { id: 20, lat: 29.433367, lng: -97.30067, name: 'Rock Creek Ranch #11H' },
+      { id: 21, lat: 29.433377, lng: -97.301034, name: 'Rock Creek Ranch #12H' },
+      { id: 22, lat: 29.44885, lng: -97.320069, name: 'Rock Creek Ranch #14H' },
+      { id: 23, lat: 29.448889, lng: -97.320057, name: 'Rock Creek Ranch #15H' },
+      { id: 24, lat: 29.4421611, lng: -97.3245786, name: 'Rock Creek Ranch #18H' },
+      { id: 25, lat: 29.442201, lng: -97.3245671, name: 'Rock Creek Ranch #20H' },
+      { id: 26, lat: 29.433346, lng: -97.301037, name: 'Rock Creek Ranch #25H' },
+      { id: 27, lat: 29.4280347, lng: -97.3244106, name: 'Flane 1H' },
+      { id: 28, lat: 29.4280717, lng: -97.3244326, name: 'RCR Jane 5H' },
+      { id: 29, lat: 29.4281084, lng: -97.3244534, name: 'RCR Jane 8H' },
+      { id: 30, lat: 29.420706, lng: -97.331291, name: 'RCR-Wyatt #1H' },
+      { id: 31, lat: 29.420717, lng: -97.331246, name: 'RCR-Wyatt #2H' },
+      { id: 32, lat: 29.420729, lng: -97.331201, name: 'RCR-Wyatt #3H' },
+      { id: 33, lat: 29.420741, lng: -97.331156, name: 'RCR-Wyatt #4H' },
+      { id: 34, lat: 29.418885, lng: -97.317251, name: 'RCRS-Jane #1H' },
+      { id: 35, lat: 29.418892, lng: -97.317204, name: 'RCRS-Jane #2H' },
+      { id: 36, lat: 29.418907, lng: -97.317112, name: 'RCRS-Jane #4H' },
+      { id: 37, lat: 29.418899, lng: -97.317158, name: 'RCRS-Jane #6H' },
+      { id: 38, lat: 29.418911, lng: -97.317086, name: 'RCRS-Jane #7H' },
+      { id: 39, lat: 29.417278, lng: -97.321441, name: 'RCRS-Fletcher #1H' },
+      { id: 40, lat: 29.417292, lng: -97.321397, name: 'RCRS-Fletcher #2H' },
+      { id: 41, lat: 29.417307, lng: -97.321353, name: 'RCRS-Fletcher #3H' },
+      { id: 42, lat: 29.415484, lng: -97.33428, name: 'RCR-Hinton #1H' },
+      { id: 43, lat: 29.415502, lng: -97.33422, name: 'RCR-Hinton #2H' },
+      { id: 44, lat: 29.415519, lng: -97.334161, name: 'RCR-Hinton #3H' },
+      { id: 45, lat: 29.433312, lng: -97.301064, name: 'Quartz 1H' }
+    ].map(well => {
+      // Generate deterministic random values based on well ID
+      const statuses = ['Operational', 'Warning', 'Critical'];
+      const statusIndex = seededRandom(well.id, 0, 3);
+      const randomStatus = statuses[statusIndex];
+      const randomProduction = seededRandom(well.id * 100, 400, 1600); // 400-1600 BBL/day
+      const randomGasPressure = seededRandom(well.id * 200, 2000, 3500); // 2000-3500 PSI
+      const randomNonCompliantHours = randomStatus === 'Critical' ? seededRandom(well.id * 300, 50, 100) :
+                                      randomStatus === 'Warning' ? seededRandom(well.id * 400, 5, 25) :
+                                      0;
 
-    // North Houston / Woodlands area
-    { id: 10, lat: 29.960, lng: -95.395, status: 'Operational', name: 'Woodlands North', production: 1423, gasPressure: 3240, nonCompliantHours: 0 },
-    { id: 11, lat: 29.995, lng: -95.332, status: 'Operational', name: 'Spring Branch', production: 1298, gasPressure: 3180, nonCompliantHours: 0 },
-    { id: 12, lat: 29.925, lng: -95.458, status: 'Warning', name: 'Tomball Junction', production: 712, gasPressure: 2380, nonCompliantHours: 12 },
-    { id: 13, lat: 29.946, lng: -95.278, status: 'Operational', name: 'North Harris', production: 1534, gasPressure: 3350, nonCompliantHours: 0 },
-
-    // Southwest Houston (near refineries)
-    { id: 14, lat: 29.685, lng: -95.485, status: 'Operational', name: 'Sugar Land Unit', production: 1267, gasPressure: 2820, nonCompliantHours: 0 },
-    { id: 15, lat: 29.650, lng: -95.422, status: 'Operational', name: 'Fort Bend Station', production: 1134, gasPressure: 2740, nonCompliantHours: 0 },
-    { id: 16, lat: 29.615, lng: -95.368, status: 'Critical', name: 'Southwest Terminal', production: 398, gasPressure: 2050, nonCompliantHours: 84 },
-    { id: 17, lat: 29.571, lng: -95.440, status: 'Operational', name: 'Brazoria Unit', production: 1089, gasPressure: 2690, nonCompliantHours: 0 },
-
-    // Southeast coastal area
-    { id: 18, lat: 29.560, lng: -95.080, status: 'Warning', name: 'Galveston Bay', production: 678, gasPressure: 2290, nonCompliantHours: 16 },
-    { id: 19, lat: 29.525, lng: -95.125, status: 'Operational', name: 'Clear Lake Station', production: 1456, gasPressure: 3080, nonCompliantHours: 0 },
-    { id: 20, lat: 29.484, lng: -95.055, status: 'Operational', name: 'Coastal Terminal', production: 1312, gasPressure: 2960, nonCompliantHours: 0 },
-
-    // Northwest Houston area
-    { id: 21, lat: 29.890, lng: -95.575, status: 'Operational', name: 'Northwest Hub', production: 1178, gasPressure: 2850, nonCompliantHours: 0 },
-    { id: 22, lat: 29.855, lng: -95.514, status: 'Warning', name: 'Cypress Station', production: 789, gasPressure: 2340, nonCompliantHours: 9 },
-    { id: 23, lat: 29.925, lng: -95.620, status: 'Operational', name: 'Willowbrook Unit', production: 1401, gasPressure: 3190, nonCompliantHours: 0 },
-
-    // Central Houston area
-    { id: 24, lat: 29.760, lng: -95.370, status: 'Operational', name: 'Downtown Central', production: 1523, gasPressure: 3420, nonCompliantHours: 0 },
-    { id: 25, lat: 29.795, lng: -95.323, status: 'Operational', name: 'Midtown Station', production: 1267, gasPressure: 3100, nonCompliantHours: 0 },
-  ];
+      return {
+        ...well,
+        status: randomStatus,
+        production: randomProduction,
+        gasPressure: randomGasPressure,
+        nonCompliantHours: randomNonCompliantHours
+      };
+    });
+  }, []); // Empty dependency array ensures this only runs once
 
   const stats = [
     {
@@ -672,15 +705,21 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <div className="w-3.5 h-3.5 bg-green-500 rounded-full shadow-sm"></div>
-              <span className="text-sm font-semibold text-green-700 dark:text-green-400">Operational (18)</span>
+              <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                Operational ({wellsData.filter(w => w.status === 'Operational').length})
+              </span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-3.5 h-3.5 bg-yellow-500 rounded-full shadow-sm"></div>
-              <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-400">Warning (5)</span>
+              <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-400">
+                Warning ({wellsData.filter(w => w.status === 'Warning').length})
+              </span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-3.5 h-3.5 bg-red-500 rounded-full shadow-sm"></div>
-              <span className="text-sm font-semibold text-red-700 dark:text-red-400">Critical (2)</span>
+              <span className="text-sm font-semibold text-red-700 dark:text-red-400">
+                Critical ({wellsData.filter(w => w.status === 'Critical').length})
+              </span>
             </div>
           </div>
         </div>
@@ -715,7 +754,7 @@ export default function HomeContent({ dateRange }: HomeContentProps) {
             <div style={{ borderRadius: '0.5rem', overflow: 'hidden', height: '100%', width: '100%' }}>
               <MapContainer
                 center={houstonCenter}
-                zoom={10}
+                zoom={13}
                 scrollWheelZoom={true}
                 style={{ height: '100%', width: '100%' }}
                 zoomControl={false}

@@ -26,31 +26,66 @@ interface Well {
   production: number; // BBL/day
 }
 
-// Generate 50 sample wells around Houston area
+// Actual well data with real coordinates
 const generateHoustonWells = (): Well[] => {
-  const wells: Well[] = [];
-  const houstonCenter = { lat: 29.7604, lng: -95.3698 };
   const statuses: ('active' | 'inactive' | 'maintenance')[] = ['active', 'inactive', 'maintenance'];
 
-  for (let i = 1; i <= 50; i++) {
-    // Spread wells in a radius around Houston
-    const angle = (i / 50) * 2 * Math.PI;
-    const radius = 0.3 + Math.random() * 0.4; // 0.3 to 0.7 degrees radius
+  const wellData = [
+    { name: "Cinco J Ranch LTD #1H", lat: 29.459734, lng: -97.303643 },
+    { name: "Cinco J Ranch LTD #2H", lat: 29.459802, lng: -97.303466 },
+    { name: "Garnet 1H", lat: 29.459765, lng: -97.303489 },
+    { name: "L & J Lee #1H", lat: 29.447887, lng: -97.296519 },
+    { name: "L & J Lee #2H", lat: 29.447925, lng: -97.296502 },
+    { name: "L & J Lee #4H", lat: 29.450001, lng: -97.295796 },
+    { name: "L & J Lee #5H", lat: 29.450052, lng: -97.295774 },
+    { name: "L & J Lee #6H", lat: 29.450103, lng: -97.295751 },
+    { name: "L & Lee Unit 7H", lat: 29.459729, lng: -97.30351 },
+    { name: "Rock Creek Ranch #1H", lat: 29.437156, lng: -97.315931 },
+    { name: "Rock Creek Ranch #2H", lat: 29.437179, lng: -97.315889 },
+    { name: "Rock Creek Ranch #3H", lat: 29.437523, lng: -97.316163 },
+    { name: "Rock Creek Ranch #4H", lat: 29.437542, lng: -97.316119 },
+    { name: "Rock Creek Ranch #5H", lat: 29.437905, lng: -97.308892 },
+    { name: "Rock Creek Ranch #6H", lat: 29.437926, lng: -97.308848 },
+    { name: "Rock Creek Ranch #7H", lat: 29.438265, lng: -97.309122 },
+    { name: "Rock Creek Ranch #8H", lat: 29.438049, lng: -97.30881 },
+    { name: "Rock Creek Ranch #9H", lat: 29.442132, lng: -97.324619 },
+    { name: "Rock Creek Ranch #10H", lat: 29.442381, lng: -97.32493 },
+    { name: "Rock Creek Ranch #11H", lat: 29.433367, lng: -97.30067 },
+    { name: "Rock Creek Ranch #12H", lat: 29.433377, lng: -97.301034 },
+    { name: "Rock Creek Ranch #14H", lat: 29.44885, lng: -97.320069 },
+    { name: "Rock Creek Ranch #15H", lat: 29.448889, lng: -97.320057 },
+    { name: "Rock Creek Ranch #18H", lat: 29.4421611, lng: -97.3245786 },
+    { name: "Rock Creek Ranch #20H", lat: 29.442201, lng: -97.3245671 },
+    { name: "Rock Creek Ranch #25H", lat: 29.433346, lng: -97.301037 },
+    { name: "Flane 1H", lat: 29.4280347, lng: -97.3244106 },
+    { name: "RCR Jane 5H", lat: 29.4280717, lng: -97.3244326 },
+    { name: "RCR Jane 8H", lat: 29.4281084, lng: -97.3244534 },
+    { name: "RCR-Wyatt #1H", lat: 29.420706, lng: -97.331291 },
+    { name: "RCR-Wyatt #2H", lat: 29.420717, lng: -97.331246 },
+    { name: "RCR-Wyatt #3H", lat: 29.420729, lng: -97.331201 },
+    { name: "RCR-Wyatt #4H", lat: 29.420741, lng: -97.331156 },
+    { name: "RCRS-Jane #1H", lat: 29.418885, lng: -97.317251 },
+    { name: "RCRS-Jane #2H", lat: 29.418892, lng: -97.317204 },
+    { name: "RCRS-Jane #4H", lat: 29.418907, lng: -97.317112 },
+    { name: "RCRS-Jane #6H", lat: 29.418899, lng: -97.317158 },
+    { name: "RCRS-Jane #7H", lat: 29.418911, lng: -97.317086 },
+    { name: "RCRS-Fletcher #1H", lat: 29.417278, lng: -97.321441 },
+    { name: "RCRS-Fletcher #2H", lat: 29.417292, lng: -97.321397 },
+    { name: "RCRS-Fletcher #3H", lat: 29.417307, lng: -97.321353 },
+    { name: "RCR-Hinton #1H", lat: 29.415484, lng: -97.33428 },
+    { name: "RCR-Hinton #2H", lat: 29.415502, lng: -97.33422 },
+    { name: "RCR-Hinton #3H", lat: 29.415519, lng: -97.334161 },
+    { name: "Quartz 1H", lat: 29.433312, lng: -97.301064 }
+  ];
 
-    const lat = houstonCenter.lat + radius * Math.cos(angle) + (Math.random() - 0.5) * 0.2;
-    const lng = houstonCenter.lng + radius * Math.sin(angle) + (Math.random() - 0.5) * 0.2;
-
-    wells.push({
-      id: `well-${i}`,
-      name: `Well-${String.fromCharCode(65 + Math.floor((i - 1) / 10))}${(i - 1) % 10 + 1}`,
-      lat,
-      lng,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      production: Math.floor(80 + Math.random() * 150),
-    });
-  }
-
-  return wells;
+  return wellData.map((well, index) => ({
+    id: `well-${index + 1}`,
+    name: well.name,
+    lat: well.lat,
+    lng: well.lng,
+    status: statuses[Math.floor(Math.random() * statuses.length)],
+    production: Math.floor(80 + Math.random() * 150),
+  }));
 };
 
 const getWellColor = (status: string): string => {
@@ -89,7 +124,7 @@ export default function MultiWellMap({ onNext }: MultiWellMapProps) {
   const [wells] = useState<Well[]>(generateHoustonWells());
   const [selectedWells, setSelectedWells] = useState<string[]>([]);
   const [deleteMode, setDeleteMode] = useState(false);
-  const houstonCenter: [number, number] = [29.7604, -95.3698];
+  const houstonCenter: [number, number] = [29.435, -97.31]; // Centered on well locations
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<boolean>(false);
   const featureGroupRef = useRef<any>(null);
@@ -338,7 +373,7 @@ export default function MultiWellMap({ onNext }: MultiWellMapProps) {
         )}
         <MapContainer
           center={houstonCenter}
-          zoom={10}
+          zoom={13}
           scrollWheelZoom={true}
           style={{ height: '100%', width: '100%' }}
           zoomControl={true}

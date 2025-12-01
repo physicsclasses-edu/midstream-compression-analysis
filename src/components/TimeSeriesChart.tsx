@@ -227,10 +227,24 @@ const generateTimeSeriesData = (metrics: string[], well: string, dateRange: { fr
           const actualValue = oilProductionValues[hourKey];
           if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
             value = 0;
-          } else if (day < 3 || day >= 10) {
-            value = actualValue + (seededRandom((day * 24 + hour) * 200 + 50) - 0.5) * 8;
           } else {
-            value = actualValue + (seededRandom((day * 24 + hour) * 200 + 100) - 0.5) * 20;
+            // BTE is the baseline prediction
+            if (metric === 'Predicted Oil Production Rate (BTE)') {
+              if (day < 3 || day >= 10) {
+                value = actualValue + (seededRandom((day * 24 + hour) * 200 + 50) - 0.5) * 8;
+              } else {
+                value = actualValue + (seededRandom((day * 24 + hour) * 200 + 100) - 0.5) * 20;
+              }
+            } else {
+              // Predicted Oil Production Rate is consistently 10-12% better than BTE
+              if (day < 3 || day >= 10) {
+                const baseValue = actualValue + (seededRandom((day * 24 + hour) * 200 + 50) - 0.5) * 8;
+                value = baseValue * 1.11; // 11% improvement
+              } else {
+                const baseValue = actualValue + (seededRandom((day * 24 + hour) * 200 + 100) - 0.5) * 20;
+                value = baseValue * 1.11; // 11% improvement
+              }
+            }
           }
         } else {
           if ((day >= 3 && day <= 4) || (day >= 7 && day <= 9)) {
